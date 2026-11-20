@@ -15,9 +15,11 @@ services:
       N8N_ENFORCE_SETTINGS_FILE_PERMISSIONS: "true"
       N8N_SECURE_COOKIE: "false"
       WEBHOOK_URL: ${WEBHOOK_URL}
+      N8N_RESTRICT_FILE_ACCESS_TO: /files
 
     volumes:
       - n8n_data:/home/node/.n8n
+      - ./storage:/files
 
 volumes:
   n8n_data:

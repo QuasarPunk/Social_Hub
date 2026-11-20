@@ -2,7 +2,7 @@
 
 **Sistema inteligente y autohospedado de gestión de contenidos para redes sociales**
 
-> **Estado:** En desarrollo · **Versión objetivo:** 0.1 (prototipo) · **Etapa 1: Infraestructura — completada · Etapa 2: Telegram — completada (respuesta autónoma confirmada)**
+> **Estado:** En desarrollo · **Versión objetivo:** 0.1 (prototipo) · **Etapas 1–3 completadas** · Etapa 4 pendiente
 
 ## ¿Qué es Social Hub?
 
@@ -10,14 +10,14 @@ Social Hub es un proyecto para centralizar y automatizar progresivamente la prod
 
 El sistema prioriza herramientas autohospedables, software libre cuando sea posible, costos operativos bajos y una arquitectura modular que pueda ampliarse por etapas.
 
-## Proyectos gestionados
+## Proyectos de ejemplo (no incorporados al motor)
 
 | Proyecto | Identidad editorial |
 | --- | --- |
 | **QuasarPunk** | Robótica, electrónica, programación, automatización, educación tecnológica y cultura maker. |
 | **Ecoaldea Lamat** | Permacultura, agroecología, bioconstrucción, educación ambiental, vida comunitaria y comunicación territorial. Incluye los contenidos de **Radio Lamat**, que comparte las redes de Ecoaldea Lamat. |
 
-**Radio Lamat no se gestiona como un tercer perfil independiente.**
+**Radio Lamat no se gestiona como un tercer perfil independiente.** Estos dos perfiles son casos de prueba; el motor deberá admitir proyectos configurados por cualquier usuario sin modificar los workflows.
 
 ## Objetivo del prototipo 0.1
 
@@ -59,7 +59,7 @@ Si el proyecto no está claro, el sistema deberá pedir una aclaración en lugar
 | **Cloudflare Quick Tunnel** | Exponer temporalmente el webhook HTTPS de n8n | Operativo durante las pruebas; URL temporal |
 | **Perfiles editoriales** | Definir estilo y criterios de cada proyecto | Pendiente |
 | **IA multimodal** | Interpretar material y generar borradores | Pendiente; proveedor/modelo por definir |
-| **Almacenamiento de materiales** | Guardar archivos recibidos y borradores | Estructura local creada; integración pendiente |
+| **Almacenamiento de materiales** | Guardar archivos recibidos y borradores | Operativo: fotografías y registros JSON persistentes |
 | **OpenCode** | Asistencia durante el desarrollo | Herramienta de desarrollo, no servicio de producción |
 
 La arquitectura procurará mantener separada la entrada de mensajes del procesamiento editorial para poder incorporar WhatsApp u otros canales más adelante.
@@ -73,9 +73,9 @@ Social_Hub/
 ├── .env                  # Variables y claves locales (ignorado por Git)
 ├── .gitignore
 ├── README.md
-├── projects/             # Perfiles editoriales de QuasarPunk y Lamat
+├── projects/             # Configuraciones editoriales de proyectos
 ├── workflows/            # Exportaciones y documentación de workflows
-├── storage/              # Archivos y borradores locales (ignorado por Git)
+├── storage/              # incoming/, records/, drafts/ (ignorado por Git)
 └── docs/                 # Documentación técnica y bitácora
 ```
 
@@ -84,6 +84,8 @@ Social_Hub/
 ## Ejecución local
 
 **Requisitos:** Docker Desktop con Docker Compose funcionando. El entorno inicial se desarrolló sobre Windows 11 x64 con WSL 2.
+
+Iniciar Docker Desktop y esperar a que el motor esté operativo antes de ejecutar Compose.
 
 1. Crear un archivo `.env` a partir de `.env.example` y completar los valores requeridos.
 2. Generar una clave de cifrado única para `N8N_ENCRYPTION_KEY` y guardarla de forma segura.
@@ -96,7 +98,8 @@ docker compose up -d
 docker compose ps
 ```
 
-4. Abrir **http://localhost:5678** y acceder con la cuenta de propietario configurada en n8n.
+4. Crear los directorios `storage/incoming`, `storage/records` y `storage/drafts` si no existen.
+5. Abrir **http://localhost:5678** y acceder con la cuenta de propietario configurada en n8n.
 
 Comandos habituales:
 
@@ -120,33 +123,36 @@ docker compose exec n8n n8n --version  # Consultar versión instalada
 - La configuración local deshabilita las cookies seguras para permitir acceso por HTTP en `localhost`. Antes de exponer n8n por Internet habrá que configurar HTTPS y revisar la seguridad.
 - Se recomienda fijar una versión concreta de la imagen de n8n en lugar de mantener indefinidamente `latest`.
 
+### Arranque del canal Telegram
+
+Ejecutar `cloudflared tunnel --url http://localhost:5678` en una terminal separada, actualizar `WEBHOOK_URL` en `.env` con la URL HTTPS temporal y ejecutar `docker compose up -d --force-recreate n8n`. Despublicar y volver a publicar el workflow para registrar el webhook actualizado. Confirmar mediante un mensaje y el historial **Executions**; el editor no muestra automáticamente los resultados de producción. Cerrar el túnel al finalizar las pruebas.
+
 ## Hoja de ruta
 
 | Etapa | Entregable | Estado |
 | --- | --- | --- |
 | **1. Infraestructura** | Docker, Compose, n8n Community, configuración y persistencia | **Completada** |
 | **2. Telegram** | Bot, webhook HTTPS, filtro por chat y respuesta | **Completada** (exportación del workflow pendiente como tarea documental) |
-| **3. Ingesta** | Recepción y almacenamiento de fotografías e instrucciones | Pendiente |
-| **4. Contexto editorial** | Clasificación y perfiles de QuasarPunk y Ecoaldea Lamat | Pendiente |
+| **3. Recepción y almacenamiento** | Recepción, almacenamiento y confirmación | **Completada funcionalmente** |
+| **4. Contexto editorial** | Clasificación dinámica y perfiles configurables | Pendiente |
 | **5. Generación con IA** | Borradores contextualizados a partir de texto e imagen | Pendiente |
 | **6. Aprobación** | Aprobar, corregir o descartar desde Telegram | Pendiente |
 | **7. Validación** | Pruebas integrales, manejo de errores y documentación | Pendiente |
 
-### Etapa 3 — Recepción de materiales (próxima sesión)
+### Etapa 4 — Clasificación e identidad editorial (próximo hito)
 
-**Objetivo:** transformar los mensajes entrantes de Telegram en registros de contenido identificables y persistentes, sin generar publicaciones todavía.
+Objetivo: identificar un proyecto registrado y cargar su configuración editorial sin codificar nombres de marcas dentro del workflow.
 
-1. **Definir el formato de entrada:** aceptar mensajes de texto, fotografías con descripción (*caption*) y fotografías sin texto; decidir cómo solicitar una instrucción faltante.
-2. **Normalizar los datos:** obtener `update_id`, `message_id`, identificador de chat, fecha, texto/caption, tipo de contenido e identificadores de archivo, evitando duplicados.
-3. **Descargar fotografías:** usar la API oficial de Telegram desde n8n y comprobar el tamaño y formato del archivo recibido.
-4. **Preparar almacenamiento persistente:** montar `storage/incoming/` del repositorio en el contenedor (o adoptar otro volumen persistente) con permisos adecuados; comprobar que los archivos sobreviven a la recreación del contenedor.
-5. **Guardar metadatos:** registrar un identificador único, la ruta del archivo y el estado inicial `RECEIVED`, sin exponer información privada en Git.
-6. **Confirmar recepción:** responder por Telegram con un acuse de recibo y el identificador del material.
-7. **Probar y documentar:** ensayar texto solo, fotografía sola, fotografía con descripción, mensajes repetidos y fallos de descarga; exportar el workflow saneado y actualizar este README.
+1. Definir un esquema versionado de perfil: identificador estable, nombre, alias, idioma, tono, audiencia, temas, restricciones y canales habilitados.
+2. Crear perfiles de ejemplo para QuasarPunk y Ecoaldea Lamat con el mismo esquema.
+3. Implementar un catálogo dinámico de perfiles y validar su configuración antes de usarla.
+4. Exponer los perfiles al contenedor mediante un montaje de solo lectura, con acceso restringido a las rutas necesarias.
+5. Resolver el proyecto por identificador o alias explícito; ante ambigüedad o ausencia, solicitar una selección vinculada al identificador del contenido.
+6. Guardar el identificador del proyecto y la versión del perfil en el registro; preparar el contexto editorial para la IA.
+7. Añadir un tercer perfil de prueba sin editar el workflow y comprobar que puede utilizarse.
+8. Documentar el esquema y las pruebas.
 
-**Criterio de cierre:** un mensaje o fotografía enviado al bot queda registrado de manera persistente, con metadatos básicos y confirmación de recepción, sin intervención manual en n8n. La clasificación entre QuasarPunk y Ecoaldea Lamat corresponde a la Etapa 4.
-
-**Nota técnica:** el volumen `n8n_data` conserva la información interna de n8n, pero **no** guarda automáticamente los archivos en `storage/incoming/`. Habrá que montar y probar ese almacenamiento de forma explícita.
+**Decisión de diseño propuesta:** archivos JSON por proyecto en 0.1, interfaz de administración y base de datos de producto en una fase posterior. Los secretos y credenciales de plataformas no forman parte de los perfiles. El prototipo es de un único operador; una instalación compartida requerirá autenticación, autorización y aislamiento entre espacios de trabajo.
 
 ### Evolución futura (fuera del alcance de 0.1)
 
@@ -177,7 +183,7 @@ Publicación y programación mediante APIs oficiales, integración de WhatsApp, 
 
 **Logros comprobados:**
 
-- Creación del bot **Social Hub** (`@YourSocialHub_bot`) mediante BotFather.
+- Creación del bot **Social Hub** mediante BotFather.
 - Instalación de Telegram en computadora y teléfono, e inicio de conversación con el bot.
 - Registro del token en el gestor de credenciales de n8n; el token no forma parte del repositorio.
 - Creación del workflow `SH-01 - Telegram Entrada` con **Telegram Trigger**, filtro **IF** por `chat.id` y nodo **Telegram — Send Message**.
@@ -194,15 +200,41 @@ Publicación y programación mediante APIs oficiales, integración de WhatsApp, 
 
 **Seguridad del workflow:** no subir al repositorio el token del bot, el `chat.id` real, URL temporal del túnel, datos de ejecuciones ni otros identificadores privados. Para una exportación pública, sustituir el ID fijo del filtro por una configuración no sensible y revisar el JSON exportado antes del commit. La prueba de autorización negativa (chat no autorizado) sigue pendiente.
 
+### 20 de noviembre de 2026 — Etapa 3: Recepción y almacenamiento completada
+
+**Logros comprobados:**
+
+- Montaje persistente `./storage:/files` y configuración `N8N_RESTRICT_FILE_ACCESS_TO: /files`; prueba de escritura desde el contenedor y lectura en Windows exitosa.
+- Directorios `storage/incoming`, `storage/records` y `storage/drafts`.
+- Normalización de mensajes mediante JavaScript: identificador `tg-<update_id>`, tipo, chat, mensaje, instrucción, proyecto inicialmente nulo, archivo Telegram, ruta, fecha UTC y estado.
+- Clasificación mediante Switch en tres ramas (`photo`, `text`, `unsupported`). La expresión `{{ String($json.type).trim().toLowerCase() }}` resolvió un fallo de encaminamiento cuya causa exacta no se aisló.
+- Descarga de fotografías con Telegram Get File (`Download` activo, binario `data`) y escritura en `/files/incoming/<content_id>.jpg`. Archivo comprobado en VS Code.
+- Convergencia de texto y fotografía en `Preparar registro`, conversión a JSON y escritura en `/files/records/<content_id>.json`. Registros comprobados.
+- Confirmación por Telegram posterior al almacenamiento y respuesta para formatos no soportados. Validación de las tres ramas confirmada por el operador.
+- Recuperación del webhook tras una interrupción del túnel: nueva URL, actualización de `.env`, recreación de n8n y publicación del workflow.
+
+```text
+Telegram Trigger → IF autorización → Normalizar mensaje → Clasificar contenido
+  ├─ photo → Descargar fotografia → Guardar fotografia ─┐
+  ├─ text ──────────────────────────────────────────────┤
+  │                                                     ↓
+  │        Preparar registro → Generar JSON → Guardar registro → Confirmar recepcion
+  └─ unsupported → Avisar formato no soportado
+```
+
+Los registros conservan `content_id`, `source`, `type`, `chat_id`, `message_id`, `instruction`, `project`, `file_id`, `media_path`, `received_at`, `status` y `stored_at`. Una fotografía tiene ruta relativa `incoming/<content_id>.jpg`; un texto tiene ruta nula. El estado almacenado es `RECEIVED`. La confirmación se emite después de guardar el registro.
+
+**Alcance y pendientes:** fotografías individuales y textos; no se procesan audios, vídeos, documentos ni álbumes. Quedan pendientes pruebas específicas de duplicados, fallos de escritura, autorización negativa, recuperación ante errores y respaldos. No se confirma individualmente toda la batería ampliada de pruebas. Exportación saneada del workflow y commit pendientes de confirmación.
+
 ## Principios de desarrollo
 
 1. **Incremental:** completar y probar cada etapa antes de incorporar la siguiente.
 2. **Supervisión humana:** ninguna publicación automática en la versión 0.1.
-3. **Modularidad:** desacoplar canales, perfiles editoriales y generación de contenido.
+3. **Modularidad:** desacoplar canales, perfiles editoriales y generación de contenido; ningún proyecto debe estar fijado en el motor.
 4. **Privacidad:** proteger credenciales y evitar exponer servicios innecesariamente.
 5. **Trazabilidad:** registrar estados, errores y decisiones importantes.
 6. **Simplicidad:** no añadir servicios que el prototipo todavía no necesita.
 
 ---
 
-**Estado actual:** Etapas 1 y 2 completadas. **Próximo hito:** Etapa 3 — recepción y almacenamiento de fotografías e instrucciones. La exportación saneada de `SH-01` y el respaldo de la configuración siguen pendientes como tareas de mantenimiento.
+**Estado actual:** Etapas 1, 2 y 3 completadas funcionalmente. **Próximo hito:** Etapa 4 — clasificación dinámica y perfiles editoriales configurables. Exportación saneada de `SH-01`, commit y respaldo pendientes de confirmación.
