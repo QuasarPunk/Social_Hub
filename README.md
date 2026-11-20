@@ -2,7 +2,7 @@
 
 **Sistema inteligente y autohospedado de gestión de contenidos para redes sociales**
 
-> **Estado:** En desarrollo · **Versión objetivo:** 0.1 (prototipo) · **Etapa 1: Infraestructura — completada**
+> **Estado:** En desarrollo · **Versión objetivo:** 0.1 (prototipo) · **Etapa 1: Infraestructura — completada · Etapa 2: Telegram — completada (respuesta autónoma confirmada)**
 
 ## ¿Qué es Social Hub?
 
@@ -55,7 +55,8 @@ Si el proyecto no está claro, el sistema deberá pedir una aclaración en lugar
 | **n8n Community (autohospedado)** | Orquestar automatizaciones y workflows | Operativo |
 | **SQLite integrado en n8n** | Persistir datos internos de n8n | Operativo; persistencia comprobada |
 | **Volumen Docker `n8n_data`** | Conservar configuración, base de datos y credenciales cifradas entre reinicios | Operativo |
-| **Telegram Bot API** | Canal de entrada, revisión y aprobación | Pendiente |
+| **Telegram Bot API** | Canal de entrada y respuesta inicial | Operativo: recepción, autorización por chat y respuesta autónoma comprobadas |
+| **Cloudflare Quick Tunnel** | Exponer temporalmente el webhook HTTPS de n8n | Operativo durante las pruebas; URL temporal |
 | **Perfiles editoriales** | Definir estilo y criterios de cada proyecto | Pendiente |
 | **IA multimodal** | Interpretar material y generar borradores | Pendiente; proveedor/modelo por definir |
 | **Almacenamiento de materiales** | Guardar archivos recibidos y borradores | Estructura local creada; integración pendiente |
@@ -124,12 +125,28 @@ docker compose exec n8n n8n --version  # Consultar versión instalada
 | Etapa | Entregable | Estado |
 | --- | --- | --- |
 | **1. Infraestructura** | Docker, Compose, n8n Community, configuración y persistencia | **Completada** |
-| **2. Telegram** | Bot y recepción inicial de mensajes | Pendiente |
+| **2. Telegram** | Bot, webhook HTTPS, filtro por chat y respuesta | **Completada** (exportación del workflow pendiente como tarea documental) |
 | **3. Ingesta** | Recepción y almacenamiento de fotografías e instrucciones | Pendiente |
 | **4. Contexto editorial** | Clasificación y perfiles de QuasarPunk y Ecoaldea Lamat | Pendiente |
 | **5. Generación con IA** | Borradores contextualizados a partir de texto e imagen | Pendiente |
 | **6. Aprobación** | Aprobar, corregir o descartar desde Telegram | Pendiente |
 | **7. Validación** | Pruebas integrales, manejo de errores y documentación | Pendiente |
+
+### Etapa 3 — Recepción de materiales (próxima sesión)
+
+**Objetivo:** transformar los mensajes entrantes de Telegram en registros de contenido identificables y persistentes, sin generar publicaciones todavía.
+
+1. **Definir el formato de entrada:** aceptar mensajes de texto, fotografías con descripción (*caption*) y fotografías sin texto; decidir cómo solicitar una instrucción faltante.
+2. **Normalizar los datos:** obtener `update_id`, `message_id`, identificador de chat, fecha, texto/caption, tipo de contenido e identificadores de archivo, evitando duplicados.
+3. **Descargar fotografías:** usar la API oficial de Telegram desde n8n y comprobar el tamaño y formato del archivo recibido.
+4. **Preparar almacenamiento persistente:** montar `storage/incoming/` del repositorio en el contenedor (o adoptar otro volumen persistente) con permisos adecuados; comprobar que los archivos sobreviven a la recreación del contenedor.
+5. **Guardar metadatos:** registrar un identificador único, la ruta del archivo y el estado inicial `RECEIVED`, sin exponer información privada en Git.
+6. **Confirmar recepción:** responder por Telegram con un acuse de recibo y el identificador del material.
+7. **Probar y documentar:** ensayar texto solo, fotografía sola, fotografía con descripción, mensajes repetidos y fallos de descarga; exportar el workflow saneado y actualizar este README.
+
+**Criterio de cierre:** un mensaje o fotografía enviado al bot queda registrado de manera persistente, con metadatos básicos y confirmación de recepción, sin intervención manual en n8n. La clasificación entre QuasarPunk y Ecoaldea Lamat corresponde a la Etapa 4.
+
+**Nota técnica:** el volumen `n8n_data` conserva la información interna de n8n, pero **no** guarda automáticamente los archivos en `storage/incoming/`. Habrá que montar y probar ese almacenamiento de forma explícita.
 
 ### Evolución futura (fuera del alcance de 0.1)
 
@@ -155,6 +172,28 @@ Publicación y programación mediante APIs oficiales, integración de WhatsApp, 
 
 **Próximos ajustes técnicos:** registrar y fijar la versión exacta de n8n, establecer copias de seguridad y exportar workflows relevantes al repositorio.
 
+
+### 20 de noviembre de 2026 — Etapa 2: Telegram completada
+
+**Logros comprobados:**
+
+- Creación del bot **Social Hub** (`@YourSocialHub_bot`) mediante BotFather.
+- Instalación de Telegram en computadora y teléfono, e inicio de conversación con el bot.
+- Registro del token en el gestor de credenciales de n8n; el token no forma parte del repositorio.
+- Creación del workflow `SH-01 - Telegram Entrada` con **Telegram Trigger**, filtro **IF** por `chat.id` y nodo **Telegram — Send Message**.
+- Instalación de `cloudflared` y apertura de un túnel HTTPS temporal de Cloudflare Quick Tunnel hacia n8n local.
+- Configuración de `WEBHOOK_URL` mediante variable de entorno, evitando fijar la dirección temporal en `docker-compose.yml`.
+- Recepción exitosa de un mensaje y **respuesta del bot comprobada durante una prueba interactiva**.
+- Publicación/activación del workflow y **confirmación de respuesta automática sin ejecutar manualmente n8n**.
+
+**Resultado:** Etapa 2 completada funcionalmente. El bot responde de forma autónoma cuando n8n y el túnel están activos.
+
+**Tareas documentales y de robustez aún pendientes:** exportar un JSON saneado del workflow; registrar el commit correspondiente; probar explícitamente el rechazo de chats no autorizados.
+
+**Limitaciones del prototipo:** Docker, n8n y el túnel deben permanecer activos. Quick Tunnel cambia de URL al reiniciarse y no se considera infraestructura de producción. La URL pública del túnel también puede exponer la interfaz administrativa de n8n; utilizar solo para pruebas y cerrarlo al finalizar.
+
+**Seguridad del workflow:** no subir al repositorio el token del bot, el `chat.id` real, URL temporal del túnel, datos de ejecuciones ni otros identificadores privados. Para una exportación pública, sustituir el ID fijo del filtro por una configuración no sensible y revisar el JSON exportado antes del commit. La prueba de autorización negativa (chat no autorizado) sigue pendiente.
+
 ## Principios de desarrollo
 
 1. **Incremental:** completar y probar cada etapa antes de incorporar la siguiente.
@@ -166,4 +205,4 @@ Publicación y programación mediante APIs oficiales, integración de WhatsApp, 
 
 ---
 
-**Estado actual:** Etapa 1 finalizada. **Próximo hito:** Etapa 2 — integración de Telegram.
+**Estado actual:** Etapas 1 y 2 completadas. **Próximo hito:** Etapa 3 — recepción y almacenamiento de fotografías e instrucciones. La exportación saneada de `SH-01` y el respaldo de la configuración siguen pendientes como tareas de mantenimiento.
