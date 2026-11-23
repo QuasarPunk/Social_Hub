@@ -1,0 +1,111 @@
+{
+  "name": "SH-01 - Prueba de teclado por servicio interno",
+  "active": false,
+  "nodes": [
+    {
+      "id": "7db8a7b8-b9c4-4cfa-977e-f086a418ca51",
+      "name": "Prueba manual",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        -336,
+        -112
+      ],
+      "parameters": {}
+    },
+    {
+      "id": "035cc2f8-bc8b-459f-b249-8f7a73edcceb",
+      "name": "Simular clasificacion pendiente",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        -116,
+        -112
+      ],
+      "parameters": {
+        "mode": "raw",
+        "jsonOutput": "{\n  \"content_id\": \"tg-1000\",\n  \"chat_id\": 123456789,\n  \"status\": \"PENDING_CLASSIFICATION\",\n  \"clarification\": {\n    \"required\": true,\n    \"options\": [\n      {\n        \"project_id\": \"bitacora\",\n        \"name\": \"Bitácora\"\n      },\n      {\n        \"project_id\": \"lamat\",\n        \"name\": \"Ecoaldea Lamat\"\n      },\n      {\n        \"project_id\": \"quasarpunk\",\n        \"name\": \"QuasarPunk\"\n      }\n    ]\n  }\n}",
+        "options": {}
+      }
+    },
+    {
+      "id": "ca234caf-5187-43d6-b254-09543e05c75c",
+      "name": "Preparar botones de proyectos",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2352,
+        -32
+      ],
+      "parameters": {
+        "jsCode": "\nconst record = $input.first().json;\n\nif (\n  record.status !== \"PENDING_CLASSIFICATION\" ||\n  !record.clarification?.required\n) {\n  throw new Error(\"El contenido no requiere aclaracion\");\n}\n\nconst options = record.clarification.options ?? [];\n\nif (!options.length) {\n  throw new Error(\"No hay proyectos disponibles\");\n}\n\n// Telegram admite callback_data de hasta 64 bytes.\n// Usamos un identificador corto de contenido y proyecto.\nconst buttons = options.map(project => {\n  const callbackData = `sh:${record.content_id}:${project.project_id}`;\n  const byteLength = Buffer.byteLength(callbackData, \"utf8\");\n  if (byteLength < 1 || byteLength > 64) {\n    throw new Error(\"callback_data debe ocupar entre 1 y 64 bytes UTF-8\");\n  }\n  return [{ text: project.name, callback_data: callbackData }];\n});\n\nreturn [{\n  json: {\n    content_id: record.content_id,\n    chat_id: record.chat_id,\n    message:\n      \"📂 SOCIAL HUB — Seleccionar proyecto\\n\\n\" +\n      \"No pude identificar con certeza el destinatario \" +\n      \"del contenido.\\n\\n\" +\n      \"Selecciona el proyecto correspondiente:\",\n    reply_markup: {\n      inline_keyboard: buttons\n    }\n  }\n}];\n"
+      }
+    },
+    {
+      "id": "0285a287-9035-4f50-a9c4-96ba71fe19e9",
+      "name": "Enviar seleccion de proyecto",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        2592,
+        -32
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "http://telegram-relay:8080/sendMessage",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ ({ chat_id: $json.chat_id, text: $json.message, reply_markup: $json.reply_markup }) }}",
+        "options": {
+          "redirect": {
+            "redirect": {
+              "followRedirects": false
+            }
+          },
+          "timeout": 20000
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Prueba manual": {
+      "main": [
+        [
+          {
+            "node": "Simular clasificacion pendiente",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Simular clasificacion pendiente": {
+      "main": [
+        [
+          {
+            "node": "Preparar botones de proyectos",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Preparar botones de proyectos": {
+      "main": [
+        [
+          {
+            "node": "Enviar seleccion de proyecto",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {}
+}

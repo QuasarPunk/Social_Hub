@@ -86,11 +86,13 @@ Social_Hub/
 
 - **SH-01** filtra mensajes de Telegram por chat, normaliza texto y fotos y guarda archivos en `/files/incoming/` y registros JSON en `/files/records/`. Después invoca SH-02 y espera el resultado. La exportación actual deja desconectada la confirmación de recepción y la salida `CLASSIFIED`. La rama pendiente prepara la selección de proyecto.
 - **SH-02** lee el catálogo montado en `/files/projects`, valida perfiles activos y busca un prefijo explícito o alias normalizados. Con una coincidencia agrega el perfil editorial y las plataformas habilitadas. Ante ambigüedad ofrece los candidatos, y sin coincidencias ofrece todo el catálogo activo. Actualiza el mismo registro con `CLASSIFIED` o `PENDING_CLASSIFICATION` y devuelve el resultado a SH-01.
-- La [copia de prueba del teclado](workflows/SH-01-telegram-teclado-prueba.json) usa un disparador manual, tres proyectos ficticios en la entrada de prueba y el nodo Telegram nativo. El disparador de recepción actual escucha `message`. Procesar pulsaciones requiere una rama `callback_query`.
+- El [borrador de SH-01 para el servicio interno](workflows/SH-01-telegram-servicio-prueba.json) usa un disparador manual, tres proyectos ficticios y HTTP Request para enviar teclados dinámicos. La [copia con el nodo Telegram nativo](workflows/SH-01-telegram-teclado-prueba.json) conserva la prueba de regresión. Procesar pulsaciones requiere una rama `callback_query`.
 
 Las exportaciones crudas pueden contener referencias privadas de la instancia. Consultá el [procedimiento de desarrollo](docs/development-workflow.md) para sanear, importar y verificar cambios sin operar sobre el workflow publicado.
 
 ## Ejecución local
+
+Para probar el envío de teclados con un entorno separado, seguí la [guía del servicio interno de Telegram](docs/telegram-relay.md).
 
 **Requisitos:** Docker Desktop con Docker Compose funcionando. El entorno inicial se desarrolló sobre Windows 11 x64 con WSL 2.
 

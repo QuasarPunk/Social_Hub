@@ -35,9 +35,11 @@ Se comprobaron `n8n --version`, `n8n import:workflow --help` y `n8n export:workf
 
 El `GET` sin clave a `http://127.0.0.1:5678/api/v1/workflows` respondió **401**. La API usa la cabecera `X-N8N-API-KEY` y documenta operaciones de lista, lectura, creación y actualización. La disponibilidad autenticada queda pendiente de comprobar con una clave de desarrollo. [Autenticación y scopes](https://docs.n8n.io/api/authentication/)
 
-## Siguiente implementación del envío
+## Envío por el servicio interno
 
-También se probó pasar `reply_markup` como parte de una expresión en `additionalFields` y fijar `replyMarkup` a `none`. La captura tampoco recibió filas. Para 2.48.6, la alternativa recomendada es enviar el objeto de `Preparar botones de proyectos` con HTTP Request a un servicio interno que llame a `sendMessage`. El servicio debe tener el destino de Telegram fijo y leer el token de un secreto montado. n8n recibiría únicamente un resultado saneado. La prueba debe capturar las tres filas y comprobar con un token ficticio que los registros y errores omitan la URL saliente. [Formato de petición de Telegram](https://core.telegram.org/bots/api#making-requests) · [Secretos de Docker Compose](https://docs.docker.com/compose/how-tos/use-secrets/)
+En n8n 2.48.6, una expresión de `reply_markup` en `additionalFields` con `replyMarkup` en `none` también produjo un teclado vacío con el nodo nativo. El [borrador para el servicio interno](../workflows/SH-01-telegram-servicio-prueba.json) reutiliza `Preparar botones de proyectos` y pasa el objeto a HTTP Request 4.5. La [guía del servicio](telegram-relay.md) describe la ejecución aislada, la credencial interna y la prueba de envío con autorización.
+
+En la ejecución aislada con n8n 2.48.6 y HTTP Request 4.5, el simulador recibió las tres filas esperadas y n8n devolvió `message_id: 1`. La prueba real con Telegram queda pendiente de autorización.
 
 ## Propuesta de sincronización
 
