@@ -64,7 +64,7 @@ function requestTelegram(fetchTelegram, botToken, method, payload, signal) {
   });
 }
 
-function createRelay({ botToken, relayKey, allowedChats, fetchTelegram = fetch, timeoutMs = 5000 }) {
+function createRelay({ botToken, relayKey, allowedChats, fetchTelegram = fetch, timeoutMs = 5000, intake }) {
   if (!/^[0-9]+:[A-Za-z0-9_-]+$/.test(botToken ?? '')
     || !/^[a-f0-9]{64}$/.test(relayKey ?? '') || !allowedChats?.length
     || allowedChats.some(value => chatId(value) === null)) {
@@ -78,7 +78,8 @@ function createRelay({ botToken, relayKey, allowedChats, fetchTelegram = fetch, 
     if (!timingSafeEqual(digest(request.headers.authorization ?? ''), expectedAuth)) {
       return error(response, 401, 'unauthorized');
     }
-    if (request.url !== '/sendMessage') return error(response, 404, 'not_found');
+    const isIntake = request.url === '/classify' && intake;
+    if (request.url !== '/sendMessage' && !isIntake) return error(response, 404, 'not_found');
     if (request.method !== 'POST') {
       response.setHeader('allow', 'POST');
       return error(response, 405, 'method_not_allowed');
@@ -104,6 +105,12 @@ function createRelay({ botToken, relayKey, allowedChats, fetchTelegram = fetch, 
       payload = JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(Buffer.concat(chunks)));
     } catch {
       return error(response, 400, 'invalid_json');
+    }
+    if (isIntake) {
+      const record = await intake(payload);
+      response.writeHead(200, JSON_HEADERS);
+      response.end(JSON.stringify(record));
+      return;
     }
     if (!validMessage(payload)) return error(response, 400, 'invalid_message');
     payload.chat_id = chatId(payload.chat_id);
@@ -142,52 +149,90 @@ function createRelay({ botToken, relayKey, allowedChats, fetchTelegram = fetch, 
   });
 }
 
+function telegramCaller(botToken, fetchTelegram = fetch) {
+  return async (method, payload, timeoutMs = 5000, stop) => {
+    const timeout = AbortSignal.timeout(timeoutMs);
+    const signal = stop ? AbortSignal.any([stop, timeout]) : timeout;
+    const response = await requestTelegram(fetchTelegram, botToken, method, payload, signal);
+    if (!response.ok) {
+      await response.body?.cancel();
+      if (method === 'getUpdates' && response.status === 409) throw new Error('telegram_consumer_conflict');
+      throw new Error('telegram_http_error');
+    }
+    const body = await response.json();
+    if (body?.ok !== true) throw new Error('telegram_rejected');
+    return body.result;
+  };
+}
+
+function workflowDispatcher(url, relayKey, fetchWorkflow = fetch) {
+  return async (update, stop) => {
+    const timeout = AbortSignal.timeout(30000);
+    const response = await fetchWorkflow(url, {
+      method: 'POST',
+      headers: { ...JSON_HEADERS, authorization: 'Bearer ' + relayKey },
+      body: JSON.stringify(update),
+      redirect: 'error',
+      signal: stop ? AbortSignal.any([stop, timeout]) : timeout,
+    });
+    if (!response.ok) {
+      await response.body?.cancel();
+      throw new Error('workflow_unavailable');
+    }
+    return response.json();
+  };
+}
+
 if (require.main === module) {
   try {
     const secret = name => readFileSync(`/run/secrets/${name}`, 'utf8').trim();
     const botToken = secret('telegram_bot_token');
     const allowedChats = secret('telegram_allowed_chats').split(/\r?\n/).map(line => line.trim());
-    const server = createRelay({
-      botToken,
-      relayKey: secret('telegram_relay_key'),
-      allowedChats,
-    });
+    const relayKey = secret('telegram_relay_key');
     const seed = process.argv[2] === '--seed-dev-record';
     const poll = process.env.TELEGRAM_DEV_CALLBACKS === '1';
-    if (seed || poll) {
-      const { loadProjects, seedRecord, pollCallbacks } = require('./callbacks.cjs');
-      const projects = loadProjects('/projects');
-      const records = '/data/records';
-      const chats = new Set(allowedChats.map(chatId));
-      if (seed) {
-        if (chats.size !== 1) throw new Error('expected_single_chat');
-        seedRecord(records, projects, chats.values().next().value);
-        console.log('Registro de prueba pendiente creado');
-      } else {
-        const controller = new AbortController();
-        process.once('SIGTERM', () => {
-          controller.abort();
-          server.close();
+    const workflowUrl = process.env.TELEGRAM_WORKFLOW_URL;
+    const integrated = process.env.TELEGRAM_POLLING === '1';
+    const expectedBot = process.env.TELEGRAM_EXPECTED_BOT;
+    if ((poll && integrated) || (integrated && (!workflowUrl || !/^[A-Za-z0-9_]+$/.test(expectedBot ?? '')))) {
+      throw new Error('invalid_polling_configuration');
+    }
+    const { loadProjects, seedRecord, pollCallbacks } = require('./callbacks.cjs');
+    const { createIntake, downloadPhoto } = require('./intake.cjs');
+    const options = {
+      records: '/data/records', incoming: '/data/incoming',
+      projects: seed || poll || workflowUrl ? loadProjects('/projects') : undefined,
+      allowedChats: new Set(allowedChats.map(chatId)),
+      callTelegram: telegramCaller(botToken),
+      log: console.log,
+    };
+    const intake = workflowUrl && createIntake({
+      ...options, fetchPhoto: filePath => downloadPhoto(botToken, filePath),
+    });
+    const server = createRelay({ botToken, relayKey, allowedChats, intake });
+    if (seed) {
+      if (options.allowedChats.size !== 1) throw new Error('expected_single_chat');
+      seedRecord(options.records, options.projects, options.allowedChats.values().next().value);
+      console.log('Registro de prueba pendiente creado');
+    } else if (poll || integrated) {
+      const controller = new AbortController();
+      process.once('SIGTERM', () => {
+        controller.abort();
+        server.close();
+      });
+      server.once('listening', () => {
+        const receiver = integrated
+          ? { ...options, expectedBot, dispatchMessage: workflowDispatcher(workflowUrl, relayKey) }
+          : options;
+        pollCallbacks(receiver, controller.signal).catch(failure => {
+          if (controller.signal.aborted) return;
+          const reason = {
+            webhook_active: 'el bot tiene un webhook activo',
+            telegram_consumer_conflict: 'Telegram detectó otro consumidor para el bot',
+          }[failure.message] ?? 'no se pudo verificar el bot';
+          console.error('Recepción detenida: ' + reason);
         });
-        async function callTelegram(method, payload, timeoutMs = 5000, stop) {
-          const timeout = AbortSignal.timeout(timeoutMs);
-          const signal = stop ? AbortSignal.any([stop, timeout]) : timeout;
-          const response = await requestTelegram(fetch, botToken, method, payload, signal);
-          if (!response.ok) {
-            await response.body?.cancel();
-            throw new Error('telegram_http_error');
-          }
-          const body = await response.json();
-          if (body?.ok !== true) throw new Error('telegram_rejected');
-          return body.result;
-        }
-        server.once('listening', () => {
-          pollCallbacks({ callTelegram, records, projects, allowedChats: chats, log: console.log }, controller.signal)
-            .catch(() => {
-              if (!controller.signal.aborted) console.error('Recepción detenida: no se pudo verificar el bot de desarrollo');
-            });
-        });
-      }
+      });
     }
     if (!seed) {
       server.on('error', () => {
@@ -202,4 +247,4 @@ if (require.main === module) {
   }
 }
 
-module.exports = { createRelay };
+module.exports = { createRelay, telegramCaller, workflowDispatcher };

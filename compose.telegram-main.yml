@@ -1,0 +1,44 @@
+services:
+  n8n:
+    image: docker.n8n.io/n8nio/n8n:2.48.6
+    networks:
+      - default
+      - telegram_internal
+
+  telegram-relay:
+    build: ./services/telegram-relay
+    restart: unless-stopped
+    init: true
+    read_only: true
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    environment:
+      TELEGRAM_POLLING: "${TELEGRAM_POLLING:-0}"
+      TELEGRAM_EXPECTED_BOT: "${TELEGRAM_EXPECTED_BOT:?Definir el usuario del bot principal}"
+      TELEGRAM_WORKFLOW_URL: "http://n8n:5678/webhook/social-hub/telegram-intake"
+    volumes:
+      - ./storage/records:/data/records
+      - ./storage/incoming:/data/incoming
+      - ./projects:/projects:ro
+    secrets:
+      - telegram_bot_token
+      - telegram_relay_key
+      - telegram_allowed_chats
+    networks:
+      - telegram_internal
+      - telegram_egress
+
+secrets:
+  telegram_bot_token:
+    file: ./secrets/telegram-main/bot-token
+  telegram_relay_key:
+    file: ./secrets/telegram-main/relay-key
+  telegram_allowed_chats:
+    file: ./secrets/telegram-main/allowed-chats
+
+networks:
+  telegram_internal:
+    internal: true
+  telegram_egress:

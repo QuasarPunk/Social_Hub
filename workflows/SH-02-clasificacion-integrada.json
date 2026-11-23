@@ -1,0 +1,61 @@
+{
+  "name": "SH-02 - Clasificacion editorial integrada",
+  "nodes": [
+    {
+      "id": "classification-input",
+      "name": "Recibir actualizacion de SH-01",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "inputSource": "passthrough"
+      }
+    },
+    {
+      "id": "editorial-record",
+      "name": "Clasificar y guardar contenido",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        250,
+        0
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "http://telegram-relay:8080/classify",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json }}",
+        "options": {
+          "timeout": 25000
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Recibir actualizacion de SH-01": {
+      "main": [
+        [
+          {
+            "node": "Clasificar y guardar contenido",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "saveDataErrorExecution": "none",
+    "saveDataSuccessExecution": "none",
+    "saveManualExecutions": false,
+    "saveExecutionProgress": false
+  }
+}

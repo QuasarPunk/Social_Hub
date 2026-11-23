@@ -1,6 +1,7 @@
 const { spawnSync } = require('node:child_process');
 const { readFileSync, renameSync, unlinkSync, writeFileSync } = require('node:fs');
 const { resolve, join } = require('node:path');
+const { integratedDrafts } = require('./telegram-workflows.cjs');
 
 const root = resolve(__dirname, '..');
 const secretDir = join(root, 'secrets', 'telegram-dev');
@@ -80,10 +81,19 @@ async function main() {
   run('docker', [...compose, 'config', '--quiet'], 'Docker Compose rechazó la configuración de desarrollo.');
   console.log('Configuración de Docker Compose válida.');
   if (process.argv.includes('--check')) return;
-  if (chats.length !== 1) throw new Error('Para preparar el borrador, dejá un único destino en allowed-chats.');
+  const integrated = process.argv.includes('--integrated');
+  if (!integrated && chats.length !== 1) throw new Error('Para preparar el borrador, dejá un único destino en allowed-chats.');
 
   const credential = { id: 'SocialHubTelegramAuth01', name: 'Telegram Relay Dev', type: 'httpHeaderAuth' };
-  const workflow = draftFor(chats[0], credential);
+  const workflows = integrated ? integratedDrafts({
+    credential: { id: credential.id, name: credential.name },
+    entryId: 'SocialHubDevEntry01',
+    classificationId: 'SocialHubDevClass02',
+  }) : [draftFor(chats[0], credential)];
+  if (integrated) {
+    process.env.TELEGRAM_POLLING = '0';
+    process.env.TELEGRAM_DEV_CALLBACKS = '0';
+  }
   run('docker', [...compose, 'up', '-d', '--build'],
     'No se pudo iniciar Docker Compose de desarrollo. Revisá el acceso al motor de Docker.');
 
@@ -112,13 +122,13 @@ async function main() {
   const importDraft = [
     'set -eu', 'umask 077', 'dir=$(mktemp -d)', 'trap \'rm -rf -- "$dir"\' EXIT',
     'cd "$dir"',
-    'node -e \'const fs = require("node:fs"); const data = JSON.parse(fs.readFileSync(0, "utf8")); fs.writeFileSync("credentials.json", JSON.stringify(data.credentials)); fs.writeFileSync("workflow.json", JSON.stringify(data.workflow));\'',
+    'node -e \'const fs = require("node:fs"); const data = JSON.parse(fs.readFileSync(0, "utf8")); fs.writeFileSync("credentials.json", JSON.stringify(data.credentials)); fs.writeFileSync("workflow.json", JSON.stringify(data.workflows));\'',
     'n8n import:credentials --input=credentials.json',
     'n8n import:workflow --activeState=false --input=workflow.json',
   ].join('\n');
   run('docker', [...container, 'sh', '-c', importDraft], 'No se pudo importar el borrador y la credencial en n8n.',
-    JSON.stringify({ credentials: [{ ...credential, data: { name: 'Authorization', value: `Bearer ${key}` } }], workflow }));
-  console.log('Borrador manual y credencial Header Auth importados en n8n de desarrollo.');
+    JSON.stringify({ credentials: [{ ...credential, data: { name: 'Authorization', value: `Bearer ${key}` } }], workflows }));
+  console.log('Borradores y credencial Header Auth importados en n8n de desarrollo.');
 }
 
 main().catch(error => {

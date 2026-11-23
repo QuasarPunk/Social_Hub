@@ -280,7 +280,6 @@
       "name": "Devolver clasificacion"
     }
   ],
-  "pinData": {},
   "connections": {
     "When clicking ‘Execute workflow’": {
       "main": [
@@ -451,16 +450,10 @@
       ]
     }
   },
-  "active": true,
+  "active": false,
   "settings": {
     "executionOrder": "v1",
     "binaryMode": "separate"
   },
-  "versionId": "12ea8629-45ea-4533-b6ab-beabd83f2b91",
-  "meta": {
-    "instanceId": "ad057ab65207df5ae52ab0f551f2632c641c16bdf2b6501702d5559160c75796"
-  },
-  "nodeGroups": [],
-  "id": "y41ZqAWHqAZ7d9oP",
-  "tags": []
+  "nodeGroups": []
 }

@@ -2,7 +2,7 @@
 
 **Sistema inteligente y autohospedado de gestión de contenidos para redes sociales**
 
-> **Estado:** En desarrollo · **Versión objetivo:** 0.1 (prototipo) · Recepción, almacenamiento y clasificación editorial implementados en las exportaciones actuales · Teclado dinámico en prueba
+> **Estado:** En desarrollo · **Versión objetivo:** 0.1 (prototipo) · Clasificación editorial automática y manual verificada con el bot de pruebas · Despliegue principal pendiente
 
 ## ¿Qué es Social Hub?
 
@@ -58,7 +58,7 @@ Si el proyecto no está claro, el sistema deberá pedir una aclaración en lugar
 | **Volumen Docker `n8n_data`** | Conservar configuración, base de datos y credenciales cifradas entre reinicios | Operativo |
 | **Telegram Bot API** | Canal de entrada y respuesta inicial | Operativo: recepción, autorización por chat y respuesta autónoma comprobadas |
 | **Cloudflare Quick Tunnel** | Exponer temporalmente el webhook HTTPS de n8n | Operativo durante las pruebas; URL temporal |
-| **Perfiles editoriales** | Definir estilo y criterios de cada proyecto | Catálogo dinámico y clasificación por prefijo o alias en SH-02 |
+| **Perfiles editoriales** | Definir estilo y criterios de cada proyecto | Catálogo dinámico y resolución por identificador, alias o selección interactiva |
 | **IA multimodal** | Interpretar material y generar borradores | Pendiente; proveedor/modelo por definir |
 | **Almacenamiento de materiales** | Guardar archivos recibidos y borradores | Operativo: fotografías y registros JSON persistentes |
 | **OpenCode** | Asistencia durante el desarrollo | Herramienta de desarrollo, no servicio de producción |
@@ -84,15 +84,15 @@ Social_Hub/
 
 ## Workflows actuales
 
-- **SH-01** filtra mensajes de Telegram por chat, normaliza texto y fotos y guarda archivos en `/files/incoming/` y registros JSON en `/files/records/`. Después invoca SH-02 y espera el resultado. La exportación actual deja desconectada la confirmación de recepción y la salida `CLASSIFIED`. La rama pendiente prepara la selección de proyecto.
-- **SH-02** lee el catálogo montado en `/files/projects`, valida perfiles activos y busca un prefijo explícito o alias normalizados. Con una coincidencia agrega el perfil editorial y las plataformas habilitadas. Ante ambigüedad ofrece los candidatos, y sin coincidencias ofrece todo el catálogo activo. Actualiza el mismo registro con `CLASSIFIED` o `PENDING_CLASSIFICATION` y devuelve el resultado a SH-01.
-- El [borrador de SH-01 para el servicio interno](workflows/SH-01-telegram-servicio-prueba.json) usa un disparador manual, tres proyectos ficticios y HTTP Request para enviar teclados dinámicos. La [copia con el nodo Telegram nativo](workflows/SH-01-telegram-teclado-prueba.json) conserva la prueba de regresión. Procesar pulsaciones requiere una rama `callback_query`.
+- [SH-01 integrado](workflows/SH-01-telegram-integrado.json) recibe mensajes del único receptor de Telegram por HTTP interno autenticado, invoca SH-02 y devuelve su resultado. El relay autoriza el chat y responde con una confirmación o un teclado dinámico vinculado al contenido.
+- [SH-02 integrado](workflows/SH-02-clasificacion-integrada.json) procesa texto y fotografías mediante el servicio interno. El relay valida perfiles, clasifica por prefijo o alias y conserva el registro y la fotografía en almacenamiento persistente. Cuando hay ambigüedad ofrece los candidatos y, sin coincidencias, el catálogo activo.
+- Los callbacks llegan al mismo relay, modifican el mismo registro pendiente y conservan la primera elección. Las dos rutas comparten el [contrato de clasificación](docs/editorial-classification.md#contrato-classified-10). Las exportaciones originales y las pruebas del teclado se conservan como referencia.
 
-Las exportaciones crudas pueden contener referencias privadas de la instancia. Consultá el [procedimiento de desarrollo](docs/development-workflow.md) para sanear, importar y verificar cambios sin operar sobre el workflow publicado.
+Las exportaciones históricas versionadas son copias saneadas. Conservá los originales fuera de Git y seguí el [procedimiento de desarrollo](docs/development-workflow.md) antes de compartir una exportación nueva.
 
 ## Ejecución local
 
-Para probar el envío de teclados con un entorno separado, seguí la [guía del servicio interno de Telegram](docs/telegram-relay.md).
+Para preparar el circuito integrado o reproducir su prueba aislada, seguí la [verificación de la Etapa 4](docs/editorial-classification.md#verificación-aislada). La [guía del relay](docs/telegram-relay.md) también conserva el procedimiento de la primera prueba de teclados.
 
 **Requisitos:** Docker Desktop con Docker Compose funcionando. El entorno inicial se desarrolló sobre Windows 11 x64 con WSL 2.
 
@@ -136,7 +136,7 @@ docker compose exec n8n n8n --version  # Consultar versión instalada
 
 ### Arranque del canal Telegram
 
-Ejecutar `cloudflared tunnel --url http://localhost:5678` en una terminal separada, actualizar `WEBHOOK_URL` en `.env` con la URL HTTPS temporal y ejecutar `docker compose up -d --force-recreate n8n`. Despublicar y volver a publicar el workflow para registrar el webhook actualizado. Confirmar mediante un mensaje y el historial **Executions**; el editor no muestra automáticamente los resultados de producción. Cerrar el túnel al finalizar las pruebas.
+La instalación principal usa el Telegram Trigger y su túnel hasta el corte autorizado de la Etapa 4. El circuito integrado usa un receptor por bot y una ruta interna en n8n. El procedimiento de despliegue describe el corte entre ambos. [Despliegue principal](docs/editorial-classification.md#despliegue-principal-pendiente)
 
 ## Hoja de ruta
 
@@ -145,12 +145,12 @@ Ejecutar `cloudflared tunnel --url http://localhost:5678` en una terminal separa
 | **1. Infraestructura** | Docker, Compose, n8n Community, configuración y persistencia | **Completada** |
 | **2. Telegram** | Bot, webhook HTTPS, filtro por chat y respuesta | **Completada** (exportación del workflow pendiente como tarea documental) |
 | **3. Recepción y almacenamiento** | Recepción, almacenamiento y confirmación | **Completada funcionalmente** |
-| **4. Contexto editorial** | Clasificación dinámica, perfiles configurables y selección manual | Clasificación implementada en las exportaciones. Teclado en prueba y resolución de pulsaciones pendiente |
+| **4. Contexto editorial** | Clasificación dinámica, perfiles configurables y selección manual | Validada en desarrollo con Telegram real. Despliegue principal pendiente |
 | **5. Generación con IA** | Borradores contextualizados a partir de texto e imagen | Pendiente |
 | **6. Aprobación** | Aprobar, corregir o descartar desde Telegram | Pendiente |
 | **7. Validación** | Pruebas integrales, manejo de errores y documentación | Pendiente |
 
-### Etapa 4 — Clasificación e identidad editorial (próximo hito)
+### Etapa 4 — Clasificación e identidad editorial
 
 Objetivo: identificar un proyecto registrado y cargar su configuración editorial sin codificar nombres de marcas dentro del workflow.
 
@@ -164,6 +164,10 @@ Objetivo: identificar un proyecto registrado y cargar su configuración editoria
 8. Documentar el esquema y las pruebas.
 
 **Decisión de diseño propuesta:** archivos JSON por proyecto en 0.1, interfaz de administración y base de datos de producto en una fase posterior. Los secretos y credenciales de plataformas no forman parte de los perfiles. El prototipo es de un único operador; una instalación compartida requerirá autenticación, autorización y aislamiento entre espacios de trabajo.
+
+El [esquema, el contrato y la guía de verificación](docs/editorial-classification.md) registran la implementación y vinculan las pruebas con estos ocho criterios.
+
+La validación con el bot de pruebas confirmó la clasificación por identificador y alias, los teclados para contenido sin coincidencias y con dos candidatos, y la persistencia de una fotografía. Telegram aceptó las respuestas a los callbacks y las segundas selecciones conservaron la primera elección. Los siete registros de la sesión cumplieron el contrato `CLASSIFIED` 1.0. [Validación real](docs/editorial-classification.md#validación-real-en-desarrollo)
 
 ### Evolución futura (fuera del alcance de 0.1)
 

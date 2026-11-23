@@ -27,13 +27,7 @@
       ],
       "id": "af2187a6-6290-4dc6-a1d8-fce5128656b1",
       "name": "Telegram Trigger",
-      "webhookId": "2da4f986-ea5b-4766-a7a6-40d26d94e508",
-      "credentials": {
-        "telegramApi": {
-          "id": "ZKvLbIs8Z8m972YF",
-          "name": "Telegram - Social Hub"
-        }
-      }
+      "disabled": true
     },
     {
       "parameters": {
@@ -48,7 +42,7 @@
             {
               "id": "bba7709c-3a94-4056-8d26-664e9ab16aa8",
               "leftValue": "={{ String($json.message.chat.id) }}",
-              "rightValue": "6325035240",
+              "rightValue": "123456789",
               "operator": {
                 "type": "string",
                 "operation": "equals",
@@ -82,17 +76,9 @@
         -208
       ],
       "id": "dcfd5be9-4f59-4ff2-8112-2bd074f9b3e7",
-      "name": "Send a text message",
-      "webhookId": "782d34ad-c594-406d-aeb0-7fc710d14816",
-      "credentials": {
-        "telegramApi": {
-          "id": "ZKvLbIs8Z8m972YF",
-          "name": "Telegram - Social Hub"
-        }
-      }
+      "name": "Send a text message"
     }
   ],
-  "pinData": {},
   "connections": {
     "Telegram Trigger": {
       "main": [
@@ -117,17 +103,10 @@
       ]
     }
   },
-  "active": true,
+  "active": false,
   "settings": {
     "executionOrder": "v1",
     "binaryMode": "separate"
   },
-  "versionId": "7489c52c-a79f-4560-b663-1ab7df95a0ec",
-  "meta": {
-    "templateCredsSetupCompleted": true,
-    "instanceId": "ad057ab65207df5ae52ab0f551f2632c641c16bdf2b6501702d5559160c75796"
-  },
-  "nodeGroups": [],
-  "id": "IaLCbix7Hw3Wstor",
-  "tags": []
+  "nodeGroups": []
 }

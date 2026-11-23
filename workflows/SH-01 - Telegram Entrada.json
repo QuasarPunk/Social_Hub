@@ -27,13 +27,7 @@
       ],
       "id": "af2187a6-6290-4dc6-a1d8-fce5128656b1",
       "name": "Telegram Trigger",
-      "webhookId": "2da4f986-ea5b-4766-a7a6-40d26d94e508",
-      "credentials": {
-        "telegramApi": {
-          "id": "ZKvLbIs8Z8m972YF",
-          "name": "Telegram - Social Hub"
-        }
-      }
+      "disabled": true
     },
     {
       "parameters": {
@@ -48,7 +42,7 @@
             {
               "id": "bba7709c-3a94-4056-8d26-664e9ab16aa8",
               "leftValue": "={{ String($json.message.chat.id) }}",
-              "rightValue": "6325035240",
+              "rightValue": "123456789",
               "operator": {
                 "type": "string",
                 "operation": "equals",
@@ -186,14 +180,7 @@
         -224
       ],
       "id": "2ab9be34-0f8c-409e-9ce8-f2986cbb7376",
-      "name": "Descargar fotografia",
-      "webhookId": "f92f1700-d959-4d58-acd0-484023113845",
-      "credentials": {
-        "telegramApi": {
-          "id": "ZKvLbIs8Z8m972YF",
-          "name": "Telegram - Social Hub"
-        }
-      }
+      "name": "Descargar fotografia"
     },
     {
       "parameters": {
@@ -268,14 +255,7 @@
         -272
       ],
       "id": "dcfd5be9-4f59-4ff2-8112-2bd074f9b3e7",
-      "name": "Confirmar recepcion",
-      "webhookId": "782d34ad-c594-406d-aeb0-7fc710d14816",
-      "credentials": {
-        "telegramApi": {
-          "id": "ZKvLbIs8Z8m972YF",
-          "name": "Telegram - Social Hub"
-        }
-      }
+      "name": "Confirmar recepcion"
     },
     {
       "parameters": {
@@ -290,23 +270,14 @@
         -32
       ],
       "id": "47e68c12-6ca9-4f7d-b18d-0305fcf7d890",
-      "name": "Avisar formato no soportado",
-      "webhookId": "914aeae5-eb6e-4ba6-be89-5406f3d1286e",
-      "credentials": {
-        "telegramApi": {
-          "id": "ZKvLbIs8Z8m972YF",
-          "name": "Telegram - Social Hub"
-        }
-      }
+      "name": "Avisar formato no soportado"
     },
     {
       "parameters": {
         "workflowId": {
           "__rl": true,
-          "value": "y41ZqAWHqAZ7d9oP",
-          "mode": "list",
-          "cachedResultUrl": "/workflow/y41ZqAWHqAZ7d9oP",
-          "cachedResultName": "SH-02 - Clasificacion"
+          "mode": "id",
+          "value": ""
         },
         "workflowInputs": {
           "mappingMode": "defineBelow",
@@ -438,14 +409,7 @@
         -32
       ],
       "id": "712f6f7c-09ef-4cd2-9bbd-f419b9da713b",
-      "name": "Enviar seleccion de proyecto",
-      "webhookId": "b3c35d38-7467-4e9f-9455-71208ea0baac",
-      "credentials": {
-        "telegramApi": {
-          "id": "ZKvLbIs8Z8m972YF",
-          "name": "Telegram - Social Hub"
-        }
-      }
+      "name": "Enviar seleccion de proyecto"
     },
     {
       "parameters": {
@@ -468,7 +432,6 @@
       "name": "Enviar botones dinamicos"
     }
   ],
-  "pinData": {},
   "connections": {
     "Telegram Trigger": {
       "main": [
@@ -634,17 +597,10 @@
       ]
     }
   },
-  "active": true,
+  "active": false,
   "settings": {
     "executionOrder": "v1",
     "binaryMode": "separate"
   },
-  "versionId": "ed055310-37ab-4386-bcc6-00ed4e01c2ca",
-  "meta": {
-    "templateCredsSetupCompleted": true,
-    "instanceId": "ad057ab65207df5ae52ab0f551f2632c641c16bdf2b6501702d5559160c75796"
-  },
-  "nodeGroups": [],
-  "id": "IaLCbix7Hw3Wstor",
-  "tags": []
+  "nodeGroups": []
 }

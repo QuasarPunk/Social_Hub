@@ -1,0 +1,89 @@
+{
+  "name": "SH-01 - Entrada por Telegram Relay",
+  "nodes": [
+    {
+      "id": "telegram-intake",
+      "name": "Recibir mensaje del relay",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "webhookId": "60709010-6428-4be5-8d70-19aac5413df1",
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "social-hub/telegram-intake",
+        "authentication": "headerAuth",
+        "responseMode": "lastNode",
+        "options": {}
+      }
+    },
+    {
+      "id": "extract-update",
+      "name": "Extraer actualizacion de Telegram",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        250,
+        0
+      ],
+      "parameters": {
+        "jsCode": "return [{ json: $input.first().json.body }];"
+      }
+    },
+    {
+      "id": "run-classification",
+      "name": "Ejecutar SH-02 y devolver registro",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.4,
+      "position": [
+        500,
+        0
+      ],
+      "parameters": {
+        "source": "database",
+        "workflowId": {
+          "__rl": true,
+          "value": "",
+          "mode": "id"
+        },
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Recibir mensaje del relay": {
+      "main": [
+        [
+          {
+            "node": "Extraer actualizacion de Telegram",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extraer actualizacion de Telegram": {
+      "main": [
+        [
+          {
+            "node": "Ejecutar SH-02 y devolver registro",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "saveDataErrorExecution": "none",
+    "saveDataSuccessExecution": "none",
+    "saveManualExecutions": false,
+    "saveExecutionProgress": false
+  }
+}
