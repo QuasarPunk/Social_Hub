@@ -1,0 +1,46 @@
+services:
+  n8n:
+    image: docker.n8n.io/n8nio/n8n:2.48.6
+    ports:
+      - "127.0.0.1:5680:5678"
+    environment:
+      N8N_SECURE_COOKIE: "false"
+      N8N_DIAGNOSTICS_ENABLED: "false"
+      N8N_VERSION_NOTIFICATIONS_ENABLED: "false"
+    networks:
+      - default
+      - telegram_internal
+    volumes:
+      - n8n_dev:/home/node/.n8n
+
+  telegram-relay:
+    build: ./services/telegram-relay
+    init: true
+    read_only: true
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    secrets:
+      - telegram_bot_token
+      - telegram_relay_key
+      - telegram_allowed_chats
+    networks:
+      - telegram_internal
+      - telegram_egress
+
+secrets:
+  telegram_bot_token:
+    file: ./secrets/telegram-dev/bot-token
+  telegram_relay_key:
+    file: ./secrets/telegram-dev/relay-key
+  telegram_allowed_chats:
+    file: ./secrets/telegram-dev/allowed-chats
+
+networks:
+  telegram_internal:
+    internal: true
+  telegram_egress:
+
+volumes:
+  n8n_dev:

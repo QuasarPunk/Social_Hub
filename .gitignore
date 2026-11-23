@@ -1,4 +1,5 @@
 .env
+/secrets/
 storage/
 *.log
 .DS_Store
