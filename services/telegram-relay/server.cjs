@@ -54,6 +54,16 @@ function error(response, status, code) {
   response.end(JSON.stringify({ ok: false, error: code }));
 }
 
+function requestTelegram(fetchTelegram, botToken, method, payload, signal) {
+  return fetchTelegram(`https://api.telegram.org/bot${botToken}/${method}`, {
+    method: 'POST',
+    headers: JSON_HEADERS,
+    body: JSON.stringify(payload),
+    redirect: 'error',
+    signal,
+  });
+}
+
 function createRelay({ botToken, relayKey, allowedChats, fetchTelegram = fetch, timeoutMs = 5000 }) {
   if (!/^[0-9]+:[A-Za-z0-9_-]+$/.test(botToken ?? '')
     || !/^[a-f0-9]{64}$/.test(relayKey ?? '') || !allowedChats?.length
@@ -63,7 +73,6 @@ function createRelay({ botToken, relayKey, allowedChats, fetchTelegram = fetch, 
 
   const authorizedChats = new Set(allowedChats.map(chatId));
   const expectedAuth = digest(`Bearer ${relayKey}`);
-  const telegramUrl = `https://api.telegram.org/bot${botToken}/sendMessage`;
 
   async function handle(request, response) {
     if (!timingSafeEqual(digest(request.headers.authorization ?? ''), expectedAuth)) {
@@ -102,13 +111,7 @@ function createRelay({ botToken, relayKey, allowedChats, fetchTelegram = fetch, 
 
     const signal = AbortSignal.timeout(timeoutMs);
     try {
-      const upstream = await fetchTelegram(telegramUrl, {
-        method: 'POST',
-        headers: JSON_HEADERS,
-        body: JSON.stringify(payload),
-        redirect: 'error',
-        signal,
-      });
+      const upstream = await requestTelegram(fetchTelegram, botToken, 'sendMessage', payload, signal);
       if (!upstream.ok) {
         await upstream.body?.cancel();
         return error(response, 502, 'telegram_http_error');
@@ -142,18 +145,59 @@ function createRelay({ botToken, relayKey, allowedChats, fetchTelegram = fetch, 
 if (require.main === module) {
   try {
     const secret = name => readFileSync(`/run/secrets/${name}`, 'utf8').trim();
+    const botToken = secret('telegram_bot_token');
+    const allowedChats = secret('telegram_allowed_chats').split(/\r?\n/).map(line => line.trim());
     const server = createRelay({
-      botToken: secret('telegram_bot_token'),
+      botToken,
       relayKey: secret('telegram_relay_key'),
-      allowedChats: secret('telegram_allowed_chats').split(/\r?\n/).map(line => line.trim()),
+      allowedChats,
     });
-    server.on('error', () => {
-      console.error('No se pudo iniciar el servicio Telegram.');
-      process.exitCode = 1;
-    });
-    server.listen(8080, '0.0.0.0');
+    const seed = process.argv[2] === '--seed-dev-record';
+    const poll = process.env.TELEGRAM_DEV_CALLBACKS === '1';
+    if (seed || poll) {
+      const { loadProjects, seedRecord, pollCallbacks } = require('./callbacks.cjs');
+      const projects = loadProjects('/projects');
+      const records = '/data/records';
+      const chats = new Set(allowedChats.map(chatId));
+      if (seed) {
+        if (chats.size !== 1) throw new Error('expected_single_chat');
+        seedRecord(records, projects, chats.values().next().value);
+        console.log('Registro de prueba pendiente creado');
+      } else {
+        const controller = new AbortController();
+        process.once('SIGTERM', () => {
+          controller.abort();
+          server.close();
+        });
+        async function callTelegram(method, payload, timeoutMs = 5000, stop) {
+          const timeout = AbortSignal.timeout(timeoutMs);
+          const signal = stop ? AbortSignal.any([stop, timeout]) : timeout;
+          const response = await requestTelegram(fetch, botToken, method, payload, signal);
+          if (!response.ok) {
+            await response.body?.cancel();
+            throw new Error('telegram_http_error');
+          }
+          const body = await response.json();
+          if (body?.ok !== true) throw new Error('telegram_rejected');
+          return body.result;
+        }
+        server.once('listening', () => {
+          pollCallbacks({ callTelegram, records, projects, allowedChats: chats, log: console.log }, controller.signal)
+            .catch(() => {
+              if (!controller.signal.aborted) console.error('Recepción detenida: no se pudo verificar el bot de desarrollo');
+            });
+        });
+      }
+    }
+    if (!seed) {
+      server.on('error', () => {
+        console.error('No se pudo iniciar el servicio Telegram.');
+        process.exitCode = 1;
+      });
+      server.listen(8080, '0.0.0.0');
+    }
   } catch {
-    console.error('Configuración inválida del servicio Telegram.');
+    console.error('No se pudo configurar Telegram Relay o crear el registro de prueba.');
     process.exitCode = 1;
   }
 }

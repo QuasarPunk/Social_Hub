@@ -15,6 +15,11 @@ services:
 
   telegram-relay:
     build: ./services/telegram-relay
+    environment:
+      TELEGRAM_DEV_CALLBACKS: "${TELEGRAM_DEV_CALLBACKS:-0}"
+    volumes:
+      - telegram_records:/data/records
+      - ./projects:/projects:ro
     init: true
     read_only: true
     cap_drop:
@@ -44,3 +49,4 @@ networks:
 
 volumes:
   n8n_dev:
+  telegram_records:

@@ -2,7 +2,7 @@
 
 El nodo HTTP Request envía el teclado al servicio `telegram-relay` por la red privada de Compose. El servicio verifica la credencial interna y la lista de chats antes de llamar a `sendMessage` en Telegram. El contenedor del servicio tiene salida a Internet y carece de puertos publicados. La API oficial requiere el token en la ruta de la solicitud HTTPS saliente. Esa URL se construye dentro del servicio y se omite de las respuestas y los registros. [Telegram Bot API](https://core.telegram.org/bots/api#making-requests) · [Secretos de Compose](https://docs.docker.com/compose/how-tos/use-secrets/)
 
-El flujo actual recibe `message`. La implementación de `answerCallbackQuery` queda pendiente junto con la recepción de `callback_query` y la validación de la selección editorial. [Telegram Bot API](https://core.telegram.org/bots/api#callbackquery)
+El relay de desarrollo puede recibir `callback_query` por long polling y responder con `answerCallbackQuery`. El receptor se habilita explícitamente y verifica que el token corresponda a `@Test_Social_Hub_bot` antes de consultar actualizaciones. [Telegram Bot API](https://core.telegram.org/bots/api#callbackquery)
 
 ## Contrato HTTP
 
@@ -73,7 +73,44 @@ Desde la raíz del repositorio, `node scripts/prepare-telegram-dev.cjs --check` 
    ```
 
 4. Importá [SH-01 de prueba](../workflows/SH-01-telegram-servicio-prueba.json) como borrador. En **Enviar seleccion de proyecto**, asigná una credencial **Header Auth** nueva con nombre de cabecera `Authorization` y valor `Bearer ` seguido de la clave interna. Guardá el valor únicamente en la credencial de n8n. La URL interna, la expresión JSON y los límites de tiempo ya están configurados. [Credenciales de HTTP Request](https://docs.n8n.io/integrations/builtin/credentials/httprequest/)
-5. En **Simular clasificacion pendiente**, reemplazá solamente el `chat_id` ficticio por el ID autorizado. Ejecutá **Prueba manual** una vez. Verificá `ok: true`, el `message_id` devuelto y las tres filas visibles en el chat. La prueba termina con la visualización del teclado. Registrá el resultado sin incluir el chat, las claves ni datos de ejecución.
+5. En **Simular clasificacion pendiente**, reemplazá solamente el `chat_id` ficticio por el ID autorizado. Ejecutá **Prueba manual** una vez. Verificá `ok: true`, el `message_id` devuelto y las tres filas visibles en el chat. Registrá el resultado sin incluir el chat, las claves ni datos de ejecución.
 6. Detené el proyecto con `docker compose --env-file .env.example -p social-hub-telegram-dev -f compose.telegram-dev.yml down`. La base local queda disponible para la próxima prueba.
 
 La conexión del nodo con el SH-01 operativo, los cambios de webhooks y cualquier publicación son acciones posteriores con autorización propia. En un borrador aprobado de SH-01, el nodo se conecta a la salida de **Preparar botones de proyectos**, que ya entrega `chat_id`, `message` y `reply_markup`.
+
+## Verificar la selección desde los botones
+
+Desde PowerShell en la raíz del repositorio, corré primero la suite con Telegram simulado. El test nuevo entrega actualizaciones ficticias al mismo receptor que usa el relay y comprueba su llegada, la respuesta y el registro persistido.
+
+```powershell
+node --test tests/*.test.cjs
+```
+
+Prepará sólo el relay y el registro de desarrollo con la recepción deshabilitada. El registro `tg-1000` corresponde al teclado de la primera prueba y se crea una sola vez. Si ya existe, la siembra falla y conserva la elección previa.
+
+```powershell
+$telegramDevCompose = @('--env-file', '.env.example', '-p', 'social-hub-telegram-dev', '-f', 'compose.telegram-dev.yml')
+$env:TELEGRAM_DEV_CALLBACKS = '0'
+docker compose @telegramDevCompose config --quiet
+docker compose @telegramDevCompose up -d --no-deps --build telegram-relay
+docker compose @telegramDevCompose exec -T telegram-relay node /app/server.cjs --seed-dev-record
+```
+
+Para una prueba real autorizada, mantené un solo receptor del bot de desarrollo. Si el bot tiene un webhook activo u otro consumidor de `getUpdates`, resolvé ese conflicto antes de pulsar el botón. Estos comandos no registran ni eliminan webhooks. [Telegram getUpdates](https://core.telegram.org/bots/api#getupdates)
+
+```powershell
+$env:TELEGRAM_DEV_CALLBACKS = '1'
+docker compose @telegramDevCompose up -d --no-deps telegram-relay
+docker compose @telegramDevCompose logs --tail 20 -f telegram-relay
+```
+
+Esperá la línea `Recepción de callback_query activa`. Al pulsar un botón del mensaje que ya recibiste, `callback_query recibida` confirma la llegada al relay y `answerCallbackQuery aceptada` confirma la respuesta de Telegram. En el cliente aparece un aviso como **Clasificado en QuasarPunk** y se quita el indicador de espera. Podés salir de los logs con Ctrl+C y consultar sólo el estado y el proyecto, sin mostrar el registro completo.
+
+```powershell
+docker compose @telegramDevCompose exec -T telegram-relay node -p "const record = require('/data/records/tg-1000.json'); JSON.stringify({status:record.status,project_id:record.project_id})"
+$env:TELEGRAM_DEV_CALLBACKS = '0'
+docker compose @telegramDevCompose up -d --no-deps telegram-relay
+Remove-Item Env:TELEGRAM_DEV_CALLBACKS
+```
+
+El resultado esperado es `CLASSIFIED` con el `project_id` seleccionado. Una pulsación posterior conserva la primera elección y muestra **Ya clasificado**. El aviso es temporal y los botones quedan visibles. Los registros se guardan en el volumen de desarrollo `telegram_records` y los perfiles se leen desde el montaje de sólo lectura al iniciar el relay.
