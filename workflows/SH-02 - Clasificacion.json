@@ -1,0 +1,459 @@
+{
+  "name": "SH-02 - Clasificacion",
+  "nodes": [
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        224,
+        112
+      ],
+      "id": "a7fb6e02-7ac7-4d29-9b3a-997c183e0199",
+      "name": "When clicking ‘Execute workflow’"
+    },
+    {
+      "parameters": {
+        "fileSelector": "/files/projects/*/profile.json",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.readWriteFile",
+      "typeVersion": 1.1,
+      "position": [
+        896,
+        0
+      ],
+      "id": "6e21b3cb-c8df-4363-9d6a-c279feefacfb",
+      "name": "Leer perfiles"
+    },
+    {
+      "parameters": {
+        "operation": "fromJson",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.extractFromFile",
+      "typeVersion": 1.2,
+      "position": [
+        1120,
+        0
+      ],
+      "id": "003d6df1-6224-4205-8ef2-95a3ce1f7eac",
+      "name": "Interpretar perfiles"
+    },
+    {
+      "parameters": {
+        "mode": "raw",
+        "jsonOutput": "{\n  \"content_id\": \"test-001\",\n  \"source\": \"telegram\",\n  \"type\": \"photo\",\n\"instruction\": \"Preparar una publicación sobre este evento.\",\n  \"project\": null,\n  \"media_path\": null,\n  \"status\": \"RECEIVED\"\n}\n",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        384,
+        112
+      ],
+      "id": "6a9d09b3-7361-449d-a5c4-f7b51f13f4f6",
+      "name": "Simular registro"
+    },
+    {
+      "parameters": {
+        "jsCode": "\nconst items = $input.all();\n\nconst projects = [];\nconst warnings = [];\nconst usedIds = new Set();\n\nfor (const item of items) {\n\n  const profile = item.json.data ?? item.json;\n\n  // Ignorar plantillas y proyectos inactivos\n  if (profile.active !== true) {\n    continue;\n  }\n\n  // Validar campos esenciales\n  if (\n    typeof profile.project_id !== \"string\" ||\n    !/^[a-z0-9_-]+$/.test(profile.project_id) ||\n    typeof profile.name !== \"string\" ||\n    !profile.name.trim() ||\n    !Array.isArray(profile.aliases) ||\n    !profile.aliases.every(a => typeof a === \"string\") ||\n    profile.schema_version !== \"1.0\"\n  ) {\n    warnings.push(\"Perfil con estructura incorrecta\");\n    continue;\n  }\n\n  // Detectar identificadores duplicados\n  if (usedIds.has(profile.project_id)) {\n    throw new Error(\n      \"Proyecto duplicado: \" + profile.project_id\n    );\n  }\n\n  usedIds.add(profile.project_id);\n\n  // Incorporar proyecto al catalogo\n  projects.push({\n    project_id: profile.project_id,\n    name: profile.name,\n    aliases: profile.aliases,\n    profile: profile\n  });\n}\n\n\nconst aliasOwners = new Map();\n\nfunction normalizeAlias(value) {\n  return String(value)\n    .normalize(\"NFD\")\n    .replace(/[\\u0300-\\u036f]/g, \"\")\n    .toLowerCase()\n    .replace(/\\s+/g, \" \")\n    .trim();\n}\n\nfor (const project of projects) {\n  const aliases = new Set([\n    project.project_id,\n    project.name,\n    ...project.aliases\n  ].map(normalizeAlias).filter(Boolean));\n\n  for (const alias of aliases) {\n    if (aliasOwners.has(alias)) {\n      throw new Error(\n        `Alias duplicado \"${alias}\" entre ` +\n        `\"${aliasOwners.get(alias)}\" y ` +\n        `\"${project.project_id}\"`\n      );\n    }\n\n    aliasOwners.set(alias, project.project_id);\n  }\n}\n\n\nreturn [{\n  json: {\n    catalog_version: \"1.0\",\n    generated_at: new Date().toISOString(),\n    total_projects: projects.length,\n    projects: projects,\n    warnings: warnings\n  }\n}];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1344,
+        0
+      ],
+      "id": "4350630b-4590-4243-93f5-feb54769739e",
+      "name": "Construir catalogo"
+    },
+    {
+      "parameters": {
+        "jsCode": "\nconst catalog = $input.first().json;\nconst record = $('Conservar registro de entrada').first().json;\n\n// Normalizar texto para facilitar comparaciones\nfunction normalize(value) {\n  return String(value ?? \"\")\n    .normalize(\"NFD\")\n    .replace(/[\\u0300-\\u036f]/g, \"\")\n    .toLowerCase()\n    .replace(/\\s+/g, \" \")\n    .trim();\n}\n\n// Escapar caracteres especiales de expresiones regulares\nfunction escapeRegex(value) {\n  return value.replace(/[.*+?^${}()|[\\]\\\\]/g, \"\\\\$&\");\n}\n\nconst instruction = normalize(record.instruction);\n\nconst candidates = catalog.projects.map(project => ({\n  project_id: project.project_id,\n  name: project.name,\n  aliases: [...new Set([\n    project.project_id,\n    project.name,\n    ...project.aliases\n  ].map(normalize).filter(Boolean))]\n}));\n\n// Buscar una referencia explícita al comienzo\nconst separator = instruction.indexOf(\":\");\n\nlet matches = [];\nlet method = null;\n\nif (separator > 0) {\n  const prefix = instruction.slice(0, separator).trim();\n\n  matches = candidates.filter(project =>\n    project.aliases.includes(prefix)\n  );\n\n  if (matches.length > 0) {\n    method = \"explicit_prefix\";\n  }\n}\n\n// Si no existe una referencia explícita,\n// buscar nombres y alias en toda la instrucción\nif (matches.length === 0) {\n  matches = candidates.filter(project =>\n    project.aliases.some(alias => {\n      const pattern = new RegExp(\n        \"(^|[^\\\\p{L}\\\\p{N}_])\" +\n        escapeRegex(alias) +\n        \"($|[^\\\\p{L}\\\\p{N}_])\",\n        \"u\"\n      );\n\n      return pattern.test(instruction);\n    })\n  );\n\n  if (matches.length > 0) {\n    method = \"alias_match\";\n  }\n}\n\n// Determinar el resultado\nlet classificationStatus = \"UNIDENTIFIED\";\n\nif (matches.length === 1) {\n  classificationStatus = \"IDENTIFIED\";\n} else if (matches.length > 1) {\n  classificationStatus = \"AMBIGUOUS\";\n}\n\nreturn [{\n  json: {\n    ...record,\n    project: matches.length === 1\n      ? matches[0].project_id\n      : null,\n    classification: {\n      status: classificationStatus,\n      method: method,\n      candidates: matches.map(project => ({\n        project_id: project.project_id,\n        name: project.name\n      })),\n      classified_at: new Date().toISOString()\n    }\n  }\n}];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1568,
+        0
+      ],
+      "id": "b77e0cfe-8f59-4d12-a0b6-ac3eeda7a7fd",
+      "name": "Identificar proyecto"
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 4
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.classification.status }}",
+                    "rightValue": "IDENTIFIED",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "0ad8d864-ed34-4dc8-b6e4-f87b2175f8db"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 4
+                },
+                "conditions": [
+                  {
+                    "id": "0117f91f-a913-40d1-a91d-d561ebc25f6b",
+                    "leftValue": "={{ $json.classification.status }}",
+                    "rightValue": "AMBIGUOUS",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 4
+                },
+                "conditions": [
+                  {
+                    "id": "d6383a77-add1-400c-aaf3-c436a11d90ba",
+                    "leftValue": "={{ $json.classification.status }}",
+                    "rightValue": "UNIDENTIFIED",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.5,
+      "position": [
+        1792,
+        -16
+      ],
+      "id": "f5e2ea0d-47cb-4b42-8791-4223ee4a44cb",
+      "name": "Gestionar clasificacion"
+    },
+    {
+      "parameters": {
+        "jsCode": "\nconst record = $input.first().json;\nconst catalog = $('Construir catalogo').first().json;\n\nconst isAmbiguous =\n  record.classification.status === \"AMBIGUOUS\";\n\n// Mostrar candidatos o todos los proyectos activos\nconst options = isAmbiguous\n  ? record.classification.candidates\n  : catalog.projects.map(project => ({\n      project_id: project.project_id,\n      name: project.name\n    }));\n\n// Construir lista de opciones\nconst numberedOptions = options.map((project, index) => ({\n  option: index + 1,\n  project_id: project.project_id,\n  name: project.name\n}));\n\nconst list = numberedOptions.map(project =>\n  `${project.option}. ${project.name}`\n).join(\"\\n\");\n\nlet message;\n\nif (options.length === 0) {\n  message =\n    \"No hay proyectos disponibles.\\n\\n\" +\n    \"Configura al menos un perfil editorial activo.\";\n} else {\n  const introduction = isAmbiguous\n    ? \"He identificado varios proyectos posibles.\"\n    : \"No he podido identificar el proyecto.\";\n\n  message =\n    \"⚠️ SOCIAL HUB — Clasificacion pendiente\\n\\n\" +\n    introduction + \"\\n\\n\" +\n    \"¿A que proyecto pertenece este contenido?\\n\\n\" +\n    list + \"\\n\\n\" +\n    \"ID del contenido: \" + record.content_id + \"\\n\\n\" +\n    \"Selecciona el proyecto correspondiente.\";\n}\n\nreturn [{\n  json: {\n    ...record,\n    status: \"PENDING_CLASSIFICATION\",\n    clarification: {\n      required: true,\n      reason: record.classification.status,\n      options: numberedOptions,\n      message: message,\n      requested_at: new Date().toISOString()\n    }\n  }\n}];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2016,
+        16
+      ],
+      "id": "5194e591-12c9-42e0-99d5-ca7646ec2563",
+      "name": "Solicitar aclaracion"
+    },
+    {
+      "parameters": {
+        "jsCode": "\nconst record = $input.first().json;\nconst catalog = $('Construir catalogo').first().json;\n\nconst project = catalog.projects.find(\n  p => p.project_id === record.project\n);\n\nif (!project) {\n  throw new Error(\n    \"No se encontro el perfil: \" + record.project\n  );\n}\n\nconst enabledPlatforms = Object.entries(\n  project.profile.platforms ?? {}\n)\n  .filter(([name, config]) => config.enabled === true)\n  .map(([name, config]) => name);\n\nreturn [{\n  json: {\n    ...record,\n    status: \"CLASSIFIED\",\n    editorial_profile: project.profile,\n    target_platforms: enabledPlatforms,\n    clarification: {\n      required: false\n    },\n    updated_at: new Date().toISOString()\n  }\n}];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2016,
+        -128
+      ],
+      "id": "8bc7ca26-9cdf-4e88-baef-5d181f611948",
+      "name": "Cargar perfil editorial"
+    },
+    {
+      "parameters": {
+        "jsCode": "\nconst record = $input.first().json;\n\nif (\n  typeof record.content_id !== \"string\" ||\n  !/^[a-zA-Z0-9_-]+$/.test(record.content_id)\n) {\n  throw new Error(\"Identificador de contenido invalido\");\n}\n\nreturn [{\n  json: {\n    ...record,\n    updated_at: new Date().toISOString()\n  }\n}];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2240,
+        -64
+      ],
+      "id": "9a43362b-74a9-48d2-8d65-fd3212228e28",
+      "name": "Preparar registro actualizado"
+    },
+    {
+      "parameters": {
+        "operation": "toJson",
+        "mode": "each",
+        "binaryPropertyName": "=data",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.convertToFile",
+      "typeVersion": 1.2,
+      "position": [
+        2464,
+        -64
+      ],
+      "id": "5a444e73-16aa-44a0-b0da-5b6ae0271786",
+      "name": "Generar JSON actualizado"
+    },
+    {
+      "parameters": {
+        "operation": "write",
+        "fileName": "={{ '/files/records/' + $('Preparar registro actualizado').first().json.content_id + '.json' }}",
+        "dataPropertyName": "=data",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.readWriteFile",
+      "typeVersion": 1.1,
+      "position": [
+        2688,
+        -64
+      ],
+      "id": "739407a1-667e-4252-a19b-b2ba71023551",
+      "name": "Guardar registro actualizado"
+    },
+    {
+      "parameters": {
+        "inputSource": "passthrough"
+      },
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        384,
+        -80
+      ],
+      "id": "34b8daa0-0742-4664-a0ce-2e06769f2107",
+      "name": "Sub-workflow Trigger"
+    },
+    {
+      "parameters": {
+        "jsCode": "\nconst record = $input.first().json;\n\nif (\n  typeof record.content_id !== \"string\" ||\n  typeof record.instruction !== \"string\"\n) {\n  throw new Error(\"Registro de entrada invalido\");\n}\n\nreturn [{ json: record }];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        704,
+        0
+      ],
+      "id": "66cbe0c1-6874-4348-9840-983f25aa456b",
+      "name": "Conservar registro de entrada"
+    },
+    {
+      "parameters": {
+        "jsCode": "\nconst record = $('Preparar registro actualizado').first().json;\n\nreturn [{\n  json: {\n    content_id: record.content_id,\n    chat_id: record.chat_id ?? null,\n    project: record.project,\n    status: record.status,\n    classification: record.classification,\n    clarification: record.clarification ?? null\n  }\n}];\n\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2912,
+        -64
+      ],
+      "id": "9be1555e-bb92-4dbe-93ea-bf8ea6a7a0be",
+      "name": "Devolver clasificacion"
+    }
+  ],
+  "connections": {
+    "When clicking ‘Execute workflow’": {
+      "main": [
+        [
+          {
+            "node": "Simular registro",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Leer perfiles": {
+      "main": [
+        [
+          {
+            "node": "Interpretar perfiles",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Interpretar perfiles": {
+      "main": [
+        [
+          {
+            "node": "Construir catalogo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Simular registro": {
+      "main": [
+        [
+          {
+            "node": "Conservar registro de entrada",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Construir catalogo": {
+      "main": [
+        [
+          {
+            "node": "Identificar proyecto",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Identificar proyecto": {
+      "main": [
+        [
+          {
+            "node": "Gestionar clasificacion",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gestionar clasificacion": {
+      "main": [
+        [
+          {
+            "node": "Cargar perfil editorial",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Solicitar aclaracion",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Solicitar aclaracion",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Cargar perfil editorial": {
+      "main": [
+        [
+          {
+            "node": "Preparar registro actualizado",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Solicitar aclaracion": {
+      "main": [
+        [
+          {
+            "node": "Preparar registro actualizado",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Preparar registro actualizado": {
+      "main": [
+        [
+          {
+            "node": "Generar JSON actualizado",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generar JSON actualizado": {
+      "main": [
+        [
+          {
+            "node": "Guardar registro actualizado",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Sub-workflow Trigger": {
+      "main": [
+        [
+          {
+            "node": "Conservar registro de entrada",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Conservar registro de entrada": {
+      "main": [
+        [
+          {
+            "node": "Leer perfiles",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Guardar registro actualizado": {
+      "main": [
+        [
+          {
+            "node": "Devolver clasificacion",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "nodeGroups": []
+}

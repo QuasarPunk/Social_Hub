@@ -1,0 +1,602 @@
+{
+  "name": "SH-01 - Prueba de teclado Telegram",
+  "active": false,
+  "nodes": [
+    {
+      "id": "7db8a7b8-b9c4-4cfa-977e-f086a418ca51",
+      "name": "Prueba manual",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        -336,
+        -112
+      ],
+      "parameters": {}
+    },
+    {
+      "id": "81d985d8-f3e0-4fb0-a7b2-6980f7065765",
+      "name": "Telegram Trigger",
+      "type": "n8n-nodes-base.telegramTrigger",
+      "typeVersion": 1.5,
+      "position": [
+        -48,
+        -112
+      ],
+      "parameters": {
+        "updates": [
+          "message"
+        ],
+        "additionalFields": {}
+      },
+      "disabled": true
+    },
+    {
+      "id": "5cc0ece4-5f31-44bd-9dba-b1c5f6bb6d03",
+      "name": "If",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.4,
+      "position": [
+        144,
+        -112
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 4
+          },
+          "conditions": [
+            {
+              "id": "bba7709c-3a94-4056-8d26-664e9ab16aa8",
+              "leftValue": "={{ String($json.message.chat.id) }}",
+              "rightValue": "0",
+              "operator": {
+                "type": "string",
+                "operation": "equals",
+                "name": "filter.operator.equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "211a2e71-8b1f-4d0b-ba72-bb5aa5a383a2",
+      "name": "Normalizar mensaje",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        368,
+        -128
+      ],
+      "parameters": {
+        "jsCode": "\nconst update = $input.first().json;\nconst message = update.message;\n\n// Identificar el tipo de contenido.\nconst hasPhoto = Array.isArray(message.photo)\n  && message.photo.length > 0;\n\n// Seleccionar la fotografía de mayor tamaño.\nconst photo = hasPhoto\n  ? message.photo[message.photo.length - 1]\n  : null;\n\nconst type = hasPhoto\n  ? \"photo\"\n  : message.text ? \"text\" : \"unsupported\";\n\n// Crear el registro de Social Hub.\nconst content = {\n  content_id: `tg-${update.update_id}`,\n  source: \"telegram\",\n  type: type,\n\n  chat_id: message.chat.id,\n  message_id: message.message_id,\n\n  instruction: message.caption || message.text || \"\",\n\n  project: null,\n\n  file_id: photo ? photo.file_id : null,\n  media_path: null,\n\n  received_at: new Date(\n    message.date * 1000\n  ).toISOString(),\n\n  status: type === \"unsupported\"\n    ? \"UNSUPPORTED\"\n    : \"RECEIVED\"\n};\n\nreturn [{ json: content }];\n"
+      }
+    },
+    {
+      "id": "72e0731e-e51c-4b8a-8c0d-2a57f2b16091",
+      "name": "Clasificar contenido",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.5,
+      "position": [
+        544,
+        -144
+      ],
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 4
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ String($json.type).trim().toLowerCase() }}",
+                    "rightValue": "photo",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "d4754ce3-af10-47e0-b8a8-6ec2a999651a"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Fotografia"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 4
+                },
+                "conditions": [
+                  {
+                    "id": "02809b1a-4fac-41dd-b4d1-d9bbc5ff69d4",
+                    "leftValue": "={{ String($json.type).trim().toLowerCase() }}",
+                    "rightValue": "text",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Texto"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 4
+                },
+                "conditions": [
+                  {
+                    "id": "b5257c81-de7b-4075-a138-d3c948f13f32",
+                    "leftValue": "={{ String($json.type).trim().toLowerCase() }}",
+                    "rightValue": "unsupported",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "No soportado"
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "af3babf1-1c32-4d28-96a4-224ea76c2b9e",
+      "name": "Descargar fotografia",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        800,
+        -224
+      ],
+      "parameters": {
+        "resource": "file",
+        "fileId": "={{ $json.file_id }}",
+        "additionalFields": {}
+      }
+    },
+    {
+      "id": "2fa0c8b1-003b-41b1-a931-65ea4228fe8a",
+      "name": "Guardar fotografia",
+      "type": "n8n-nodes-base.readWriteFile",
+      "typeVersion": 1.1,
+      "position": [
+        1024,
+        -224
+      ],
+      "parameters": {
+        "operation": "write",
+        "fileName": "={{ '/files/incoming/' + $('Normalizar mensaje').first().json.content_id + '.jpg' }}",
+        "dataPropertyName": "=data",
+        "options": {}
+      }
+    },
+    {
+      "id": "ec79e91f-7ccc-4bbe-81fe-d1df8b5a9f90",
+      "name": "Preparar registro",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1184,
+        -128
+      ],
+      "parameters": {
+        "jsCode": "\nconst content = {\n  ...$('Normalizar mensaje').first().json\n};\n\n// Actualizar la ubicación de la fotografía.\nif (content.type === \"photo\") {\n  content.media_path =\n    `incoming/${content.content_id}.jpg`;\n}\n\n// Registrar el momento del almacenamiento.\ncontent.stored_at = new Date().toISOString();\ncontent.status = \"RECEIVED\";\n\nreturn [{ json: content }];\n"
+      }
+    },
+    {
+      "id": "2ee81f1f-9d1b-4a6f-9544-6c810befe465",
+      "name": "Generar JSON",
+      "type": "n8n-nodes-base.convertToFile",
+      "typeVersion": 1.2,
+      "position": [
+        1360,
+        -128
+      ],
+      "parameters": {
+        "operation": "toJson",
+        "mode": "each",
+        "options": {}
+      }
+    },
+    {
+      "id": "ab492968-db32-43e0-b3dd-a5ee1997022f",
+      "name": "Guardar registro",
+      "type": "n8n-nodes-base.readWriteFile",
+      "typeVersion": 1.1,
+      "position": [
+        1552,
+        -128
+      ],
+      "parameters": {
+        "operation": "write",
+        "fileName": "={{ '/files/records/' + $('Preparar registro').first().json.content_id + '.json' }}",
+        "dataPropertyName": "=data",
+        "options": {}
+      }
+    },
+    {
+      "id": "b94571df-deb7-43ad-84be-a3479c49be54",
+      "name": "Avisar formato no soportado",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        800,
+        -32
+      ],
+      "parameters": {
+        "chatId": "={{ $json.chat_id }}",
+        "text": "⚠️ Formato no soportado.  Actualmente Social Hub admite:  📝 Mensajes de texto. 📷 Fotografías con o sin descripción.  Los audios, vídeos y documentos estarán disponibles en futuras versiones.",
+        "additionalFields": {}
+      }
+    },
+    {
+      "id": "e9366c77-d521-4593-9c23-b45c1876ca75",
+      "name": "Clasificar contenido1",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.4,
+      "position": [
+        1904,
+        -128
+      ],
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "mode": "id",
+          "value": ""
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      }
+    },
+    {
+      "id": "16a5d7b6-d3de-40eb-a0fe-ced8625ab179",
+      "name": "Recuperar registro",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1728,
+        -128
+      ],
+      "parameters": {
+        "jsCode": "\nconst record = $('Preparar registro').first().json;\n\nreturn [{\n  json: record\n}];\n"
+      }
+    },
+    {
+      "id": "714e7de1-39e0-42c0-bdb5-d61c30058d1a",
+      "name": "Evaluar resultado de clasificacion",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.5,
+      "position": [
+        2128,
+        -128
+      ],
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 4
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.status }}",
+                    "rightValue": "CLASSIFIED",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "eea7b5b8-4d8f-4674-aa29-0728726a973d"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Clasificado"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 4
+                },
+                "conditions": [
+                  {
+                    "id": "22fe9c41-9851-4885-aed5-0d6f961b783d",
+                    "leftValue": "={{ String($json.status).trim() }}",
+                    "rightValue": "PENDING_CLASSIFICATION",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Pendiente"
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "ca234caf-5187-43d6-b254-09543e05c75c",
+      "name": "Preparar botones de proyectos",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2352,
+        -32
+      ],
+      "parameters": {
+        "jsCode": "\nconst record = $input.first().json;\n\nif (\n  record.status !== \"PENDING_CLASSIFICATION\" ||\n  !record.clarification?.required\n) {\n  throw new Error(\"El contenido no requiere aclaracion\");\n}\n\nconst options = record.clarification.options ?? [];\n\nif (!options.length) {\n  throw new Error(\"No hay proyectos disponibles\");\n}\n\n// Telegram admite callback_data de hasta 64 bytes.\n// Usamos un identificador corto de contenido y proyecto.\nconst buttons = options.map(project => {\n  const callbackData = `sh:${record.content_id}:${project.project_id}`;\n  const byteLength = Buffer.byteLength(callbackData, \"utf8\");\n  if (byteLength < 1 || byteLength > 64) {\n    throw new Error(\"callback_data debe ocupar entre 1 y 64 bytes UTF-8\");\n  }\n  return [{ text: project.name, callback_data: callbackData }];\n});\n\nreturn [{\n  json: {\n    content_id: record.content_id,\n    chat_id: record.chat_id,\n    message:\n      \"📂 SOCIAL HUB — Seleccionar proyecto\\n\\n\" +\n      \"No pude identificar con certeza el destinatario \" +\n      \"del contenido.\\n\\n\" +\n      \"Selecciona el proyecto correspondiente:\",\n    reply_markup: {\n      inline_keyboard: buttons\n    }\n  }\n}];\n"
+      }
+    },
+    {
+      "id": "0285a287-9035-4f50-a9c4-96ba71fe19e9",
+      "name": "Enviar seleccion de proyecto",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        2592,
+        -32
+      ],
+      "parameters": {
+        "resource": "message",
+        "operation": "sendMessage",
+        "chatId": "={{ $json.chat_id }}",
+        "text": "={{ $json.message }}",
+        "replyMarkup": "inlineKeyboard",
+        "inlineKeyboard": "={{ ({\n  rows: $json.reply_markup.inline_keyboard.map(buttons => ({\n    row: {\n      buttons: buttons.map(button => ({\n        text: button.text,\n        additionalFields: { callback_data: button.callback_data }\n      }))\n    }\n  }))\n}) }}",
+        "additionalFields": {}
+      }
+    },
+    {
+      "id": "035cc2f8-bc8b-459f-b249-8f7a73edcceb",
+      "name": "Simular clasificacion pendiente",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        -116,
+        -112
+      ],
+      "parameters": {
+        "mode": "raw",
+        "jsonOutput": "{\n  \"content_id\": \"tg-1000\",\n  \"chat_id\": 123456789,\n  \"status\": \"PENDING_CLASSIFICATION\",\n  \"clarification\": {\n    \"required\": true,\n    \"options\": [\n      {\n        \"project_id\": \"bitacora\",\n        \"name\": \"Bitácora\"\n      },\n      {\n        \"project_id\": \"lamat\",\n        \"name\": \"Ecoaldea Lamat\"\n      },\n      {\n        \"project_id\": \"quasarpunk\",\n        \"name\": \"QuasarPunk\"\n      }\n    ]\n  }\n}",
+        "options": {}
+      }
+    }
+  ],
+  "connections": {
+    "Telegram Trigger": {
+      "main": [
+        [
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If": {
+      "main": [
+        [
+          {
+            "node": "Normalizar mensaje",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalizar mensaje": {
+      "main": [
+        [
+          {
+            "node": "Clasificar contenido",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Clasificar contenido": {
+      "main": [
+        [
+          {
+            "node": "Descargar fotografia",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Preparar registro",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Avisar formato no soportado",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Descargar fotografia": {
+      "main": [
+        [
+          {
+            "node": "Guardar fotografia",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Guardar fotografia": {
+      "main": [
+        [
+          {
+            "node": "Preparar registro",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Preparar registro": {
+      "main": [
+        [
+          {
+            "node": "Generar JSON",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generar JSON": {
+      "main": [
+        [
+          {
+            "node": "Guardar registro",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Guardar registro": {
+      "main": [
+        [
+          {
+            "node": "Recuperar registro",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Clasificar contenido1": {
+      "main": [
+        [
+          {
+            "node": "Evaluar resultado de clasificacion",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Recuperar registro": {
+      "main": [
+        [
+          {
+            "node": "Clasificar contenido1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Evaluar resultado de clasificacion": {
+      "main": [
+        [],
+        [
+          {
+            "node": "Preparar botones de proyectos",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Preparar botones de proyectos": {
+      "main": [
+        [
+          {
+            "node": "Enviar seleccion de proyecto",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prueba manual": {
+      "main": [
+        [
+          {
+            "node": "Simular clasificacion pendiente",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Simular clasificacion pendiente": {
+      "main": [
+        [
+          {
+            "node": "Preparar botones de proyectos",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {}
+}
