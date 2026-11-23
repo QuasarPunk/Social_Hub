@@ -2,7 +2,7 @@
 
 **Sistema inteligente y autohospedado de gestión de contenidos para redes sociales**
 
-> **Estado:** En desarrollo · **Versión objetivo:** 0.1 (prototipo) · **Etapas 1–3 completadas** · Etapa 4 pendiente
+> **Estado:** En desarrollo · **Versión objetivo:** 0.1 (prototipo) · Recepción, almacenamiento y clasificación editorial implementados en las exportaciones actuales · Teclado dinámico en prueba
 
 ## ¿Qué es Social Hub?
 
@@ -10,14 +10,15 @@ Social Hub es un proyecto para centralizar y automatizar progresivamente la prod
 
 El sistema prioriza herramientas autohospedables, software libre cuando sea posible, costos operativos bajos y una arquitectura modular que pueda ampliarse por etapas.
 
-## Proyectos de ejemplo (no incorporados al motor)
+## Perfiles editoriales de ejemplo
 
 | Proyecto | Identidad editorial |
 | --- | --- |
 | **QuasarPunk** | Robótica, electrónica, programación, automatización, educación tecnológica y cultura maker. |
 | **Ecoaldea Lamat** | Permacultura, agroecología, bioconstrucción, educación ambiental, vida comunitaria y comunicación territorial. Incluye los contenidos de **Radio Lamat**, que comparte las redes de Ecoaldea Lamat. |
+| **Bitácora** | Perfil editorial de bitácora incluido en el catálogo de prueba. |
 
-**Radio Lamat no se gestiona como un tercer perfil independiente.** Estos dos perfiles son casos de prueba; el motor deberá admitir proyectos configurados por cualquier usuario sin modificar los workflows.
+Los perfiles activos se descubren desde `projects/*/profile.json`. Radio Lamat se incluye en el perfil de Ecoaldea Lamat. La plantilla permanece inactiva.
 
 ## Objetivo del prototipo 0.1
 
@@ -57,7 +58,7 @@ Si el proyecto no está claro, el sistema deberá pedir una aclaración en lugar
 | **Volumen Docker `n8n_data`** | Conservar configuración, base de datos y credenciales cifradas entre reinicios | Operativo |
 | **Telegram Bot API** | Canal de entrada y respuesta inicial | Operativo: recepción, autorización por chat y respuesta autónoma comprobadas |
 | **Cloudflare Quick Tunnel** | Exponer temporalmente el webhook HTTPS de n8n | Operativo durante las pruebas; URL temporal |
-| **Perfiles editoriales** | Definir estilo y criterios de cada proyecto | Pendiente |
+| **Perfiles editoriales** | Definir estilo y criterios de cada proyecto | Catálogo dinámico y clasificación por prefijo o alias en SH-02 |
 | **IA multimodal** | Interpretar material y generar borradores | Pendiente; proveedor/modelo por definir |
 | **Almacenamiento de materiales** | Guardar archivos recibidos y borradores | Operativo: fotografías y registros JSON persistentes |
 | **OpenCode** | Asistencia durante el desarrollo | Herramienta de desarrollo, no servicio de producción |
@@ -80,6 +81,14 @@ Social_Hub/
 ```
 
 > Las carpetas de trabajo pueden estar vacías mientras no se implementen sus respectivas funciones. Los workflows guardados en n8n viven inicialmente en su base de datos; **no se exportan automáticamente** a `workflows/`.
+
+## Workflows actuales
+
+- **SH-01** filtra mensajes de Telegram por chat, normaliza texto y fotos y guarda archivos en `/files/incoming/` y registros JSON en `/files/records/`. Después invoca SH-02 y espera el resultado. La exportación actual deja desconectada la confirmación de recepción y la salida `CLASSIFIED`. La rama pendiente prepara la selección de proyecto.
+- **SH-02** lee el catálogo montado en `/files/projects`, valida perfiles activos y busca un prefijo explícito o alias normalizados. Con una coincidencia agrega el perfil editorial y las plataformas habilitadas. Ante ambigüedad ofrece los candidatos, y sin coincidencias ofrece todo el catálogo activo. Actualiza el mismo registro con `CLASSIFIED` o `PENDING_CLASSIFICATION` y devuelve el resultado a SH-01.
+- La [copia de prueba del teclado](workflows/SH-01-telegram-teclado-prueba.json) usa un disparador manual, tres proyectos ficticios en la entrada de prueba y el nodo Telegram nativo. El disparador de recepción actual escucha `message`. Procesar pulsaciones requiere una rama `callback_query`.
+
+Las exportaciones crudas pueden contener referencias privadas de la instancia. Consultá el [procedimiento de desarrollo](docs/development-workflow.md) para sanear, importar y verificar cambios sin operar sobre el workflow publicado.
 
 ## Ejecución local
 
@@ -134,7 +143,7 @@ Ejecutar `cloudflared tunnel --url http://localhost:5678` en una terminal separa
 | **1. Infraestructura** | Docker, Compose, n8n Community, configuración y persistencia | **Completada** |
 | **2. Telegram** | Bot, webhook HTTPS, filtro por chat y respuesta | **Completada** (exportación del workflow pendiente como tarea documental) |
 | **3. Recepción y almacenamiento** | Recepción, almacenamiento y confirmación | **Completada funcionalmente** |
-| **4. Contexto editorial** | Clasificación dinámica y perfiles configurables | Pendiente |
+| **4. Contexto editorial** | Clasificación dinámica, perfiles configurables y selección manual | Clasificación implementada en las exportaciones. Teclado en prueba y resolución de pulsaciones pendiente |
 | **5. Generación con IA** | Borradores contextualizados a partir de texto e imagen | Pendiente |
 | **6. Aprobación** | Aprobar, corregir o descartar desde Telegram | Pendiente |
 | **7. Validación** | Pruebas integrales, manejo de errores y documentación | Pendiente |
@@ -237,4 +246,4 @@ Los registros conservan `content_id`, `source`, `type`, `chat_id`, `message_id`,
 
 ---
 
-**Estado actual:** Etapas 1, 2 y 3 completadas funcionalmente. **Próximo hito:** Etapa 4 — clasificación dinámica y perfiles editoriales configurables. Exportación saneada de `SH-01`, commit y respaldo pendientes de confirmación.
+**Estado actual:** SH-01 y SH-02 integran la recepción, el almacenamiento y la clasificación editorial en las exportaciones actuales. El próximo hito es verificar el teclado y resolver las pulsaciones antes de avanzar a la generación de borradores.
