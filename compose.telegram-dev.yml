@@ -7,18 +7,25 @@ services:
       N8N_SECURE_COOKIE: "false"
       N8N_DIAGNOSTICS_ENABLED: "false"
       N8N_VERSION_NOTIFICATIONS_ENABLED: "false"
+      N8N_RESTRICT_FILE_ACCESS_TO: "/files"
     networks:
       - default
       - telegram_internal
     volumes:
       - n8n_dev:/home/node/.n8n
+      - telegram_incoming:/files/incoming:ro
+      - telegram_records:/files/records:ro
 
   telegram-relay:
     build: ./services/telegram-relay
     environment:
       TELEGRAM_DEV_CALLBACKS: "${TELEGRAM_DEV_CALLBACKS:-0}"
+      TELEGRAM_POLLING: "${TELEGRAM_POLLING:-0}"
+      TELEGRAM_EXPECTED_BOT: "Test_Social_Hub_bot"
+      TELEGRAM_WORKFLOW_URL: "http://n8n:5678/webhook/social-hub/telegram-intake"
     volumes:
       - telegram_records:/data/records
+      - telegram_incoming:/data/incoming
       - ./projects:/projects:ro
     init: true
     read_only: true
@@ -50,3 +57,4 @@ networks:
 volumes:
   n8n_dev:
   telegram_records:
+  telegram_incoming:

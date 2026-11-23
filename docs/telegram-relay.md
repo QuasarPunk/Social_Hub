@@ -1,5 +1,7 @@
 # Servicio interno de Telegram
 
+Para el circuito de entrada, clasificación y callbacks de la Etapa 4, consultá la [guía de clasificación editorial](editorial-classification.md). Esta página conserva la prueba inicial del teclado y el modo de callbacks de desarrollo, que se ejecuta separado del receptor integrado.
+
 El nodo HTTP Request envía el teclado al servicio `telegram-relay` por la red privada de Compose. El servicio verifica la credencial interna y la lista de chats antes de llamar a `sendMessage` en Telegram. El contenedor del servicio tiene salida a Internet y carece de puertos publicados. La API oficial requiere el token en la ruta de la solicitud HTTPS saliente. Esa URL se construye dentro del servicio y se omite de las respuestas y los registros. [Telegram Bot API](https://core.telegram.org/bots/api#making-requests) · [Secretos de Compose](https://docs.docker.com/compose/how-tos/use-secrets/)
 
 El relay de desarrollo puede recibir `callback_query` por long polling y responder con `answerCallbackQuery`. El receptor se habilita explícitamente y verifica que el token corresponda a `@Test_Social_Hub_bot` antes de consultar actualizaciones. [Telegram Bot API](https://core.telegram.org/bots/api#callbackquery)

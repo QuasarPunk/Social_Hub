@@ -1,5 +1,7 @@
 # Desarrollo asistido de Social Hub
 
+El recorrido integrado de SH-01 y SH-02 se verifica con el [procedimiento aislado de la Etapa 4](editorial-classification.md#verificación-aislada). Las pruebas manuales de teclado que siguen reproducen el comportamiento de las exportaciones anteriores.
+
 ## Ciclo de trabajo
 
 1. Creá una rama y registrá la versión con `docker exec social-hub-n8n n8n --version`. La prueba usa n8n **2.48.6** y Telegram **1.2**.
