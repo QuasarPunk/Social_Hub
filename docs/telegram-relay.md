@@ -57,6 +57,8 @@ Si la imagen ya está descargada con otro tag, asigná ese tag o su ID a `$testI
 
 ## Instalación y prueba real con autorización humana
 
+Desde la raíz del repositorio, `node scripts/prepare-telegram-dev.cjs --check` valida los archivos ignorados y la configuración de Compose. Sin `--check`, inicia el proyecto de desarrollo, comprueba n8n y el relay, e importa un borrador manual y su credencial Header Auth. Para importar, el archivo `allowed-chats` debe tener un único destino distinto. El script actualiza el mismo borrador y la misma credencial en cada ejecución. La prueba real requiere autorización antes de ejecutar el borrador.
+
 1. Autorizá el uso de un bot y un chat de prueba dedicados, la salida HTTPS a `api.telegram.org` y el envío de un mensaje de prueba. Iniciá la conversación con el bot desde el chat autorizado si es un chat privado. Usá el entorno independiente de los siguientes pasos.
 2. Creá `secrets/telegram-dev/` con permisos de acceso restringidos en el host. Con un editor local, guardá tres archivos UTF-8 sin BOM. Verificá que Docker pueda montar los archivos y que el usuario `node` pueda leerlos dentro del contenedor.
    - `bot-token` contiene el token del bot de prueba.
