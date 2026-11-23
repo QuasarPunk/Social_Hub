@@ -1,0 +1,51 @@
+
+{
+  "schema_version": "1.0",
+  "project_id": "",
+  "name": "",
+  "active": false,
+  "aliases": [],
+  "identity": {
+    "description": "",
+    "mission": "",
+    "values": []
+  },
+  "audience": {
+    "description": "",
+    "segments": []
+  },
+  "communication": {
+    "language": "es",
+    "tone": [],
+    "style": "",
+    "personality": ""
+  },
+  "editorial": {
+    "topics": [],
+    "restrictions": [],
+    "custom_instructions": ""
+  },
+  "preferences": {
+    "use_emojis": true,
+    "use_hashtags": true,
+    "call_to_action": true,
+    "default_hashtags": []
+  },
+  "platforms": {
+    "instagram": {
+      "enabled": false,
+      "style": "",
+      "formats": []
+    },
+    "facebook": {
+      "enabled": false,
+      "style": "",
+      "formats": []
+    },
+    "youtube": {
+      "enabled": false,
+      "style": "",
+      "formats": []
+    }
+  }
+}

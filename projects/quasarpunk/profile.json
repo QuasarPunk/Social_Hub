@@ -1,0 +1,89 @@
+
+{
+  "schema_version": "1.0",
+  "project_id": "quasarpunk",
+  "name": "QuasarPunk",
+  "active": true,
+  "aliases": [
+    "quasarpunk",
+    "quasar",
+    "qp"
+  ],
+  "identity": {
+    "description": "Proyecto de educación, divulgación tecnológica y cultura maker.",
+    "mission": "Democratizar el conocimiento científico y tecnológico mediante la experimentación y el aprendizaje práctico.",
+    "values": [
+      "curiosidad",
+      "creatividad",
+      "autonomía tecnológica",
+      "conocimiento abierto",
+      "innovación"
+    ]
+  },
+  "audience": {
+    "description": "Personas interesadas en aprender, construir y experimentar con tecnología.",
+    "segments": [
+      "estudiantes",
+      "docentes",
+      "makers",
+      "programadores principiantes",
+      "aficionados a la electrónica"
+    ]
+  },
+  "communication": {
+    "language": "es-AR",
+    "tone": [
+      "didáctico",
+      "entusiasta",
+      "irreverente",
+      "inspirador"
+    ],
+    "style": "Claro, dinámico y accesible, con rigor técnico.",
+    "personality": "Curiosa, experimental y con sentido del humor."
+  },
+  "editorial": {
+    "topics": [
+      "robótica",
+      "Arduino",
+      "Raspberry Pi",
+      "electrónica",
+      "programación",
+      "impresión 3D",
+      "inteligencia artificial",
+      "software libre"
+    ],
+    "restrictions": [
+      "No inventar información técnica.",
+      "No prometer resultados no comprobados.",
+      "Evitar tecnicismos innecesarios."
+    ],
+    "custom_instructions": "Estimular la experimentación, el pensamiento crítico y el aprendizaje mediante proyectos reales."
+  },
+  "preferences": {
+    "use_emojis": true,
+    "use_hashtags": true,
+    "call_to_action": true,
+    "default_hashtags": [
+      "#QuasarPunk",
+      "#CulturaMaker",
+      "#Tecnologia"
+    ]
+  },
+  "platforms": {
+    "instagram": {
+      "enabled": true,
+      "style": "Dinámico, visual y atractivo.",
+      "formats": ["post", "reel", "carousel"]
+    },
+    "facebook": {
+      "enabled": true,
+      "style": "Informativo y divulgativo.",
+      "formats": ["post", "video"]
+    },
+    "youtube": {
+      "enabled": true,
+      "style": "Educativo, experimental y entretenido.",
+      "formats": ["video", "short"]
+    }
+  }
+}

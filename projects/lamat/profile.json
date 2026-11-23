@@ -1,0 +1,92 @@
+
+{
+  "schema_version": "1.0",
+  "project_id": "lamat",
+  "name": "Ecoaldea Lamat",
+  "active": true,
+  "aliases": [
+    "lamat",
+    "ecoaldea lamat",
+    "radio lamat"
+  ],
+  "identity": {
+    "description": "Proyecto comunitario, científico, educativo y cultural basado en la permacultura.",
+    "mission": "Construir alternativas socioambientales regenerativas mediante la educación, la cooperación y la acción comunitaria.",
+    "values": [
+      "cooperación",
+      "regeneración ambiental",
+      "justicia social",
+      "diversidad",
+      "soberanía",
+      "conocimiento colectivo"
+    ]
+  },
+  "audience": {
+    "description": "Personas y organizaciones interesadas en la transformación socioambiental.",
+    "segments": [
+      "comunidad local",
+      "estudiantes",
+      "educadores",
+      "productores agroecológicos",
+      "organizaciones sociales",
+      "permacultores"
+    ]
+  },
+  "communication": {
+    "language": "es-AR",
+    "tone": [
+      "reflexivo",
+      "inspirador",
+      "comunitario",
+      "divulgativo"
+    ],
+    "style": "Cercano, inclusivo, crítico y científicamente fundamentado.",
+    "personality": "Comprometida, cooperativa y esperanzadora."
+  },
+  "editorial": {
+    "topics": [
+      "permacultura",
+      "agroecología",
+      "bioconstrucción",
+      "energías renovables",
+      "restauración ambiental",
+      "educación",
+      "economía solidaria",
+      "comunicación comunitaria"
+    ],
+    "restrictions": [
+      "Evitar pseudociencias.",
+      "No difundir información ambiental sin fundamento.",
+      "Respetar la diversidad cultural y religiosa.",
+      "Evitar discursos comerciales vacíos."
+    ],
+    "custom_instructions": "Promover la participación comunitaria, la construcción de alternativas y el pensamiento crítico. Radio Lamat forma parte de la misma identidad editorial."
+  },
+  "preferences": {
+    "use_emojis": true,
+    "use_hashtags": true,
+    "call_to_action": true,
+    "default_hashtags": [
+      "#EcoaldeaLamat",
+      "#Permacultura",
+      "#Agroecologia"
+    ]
+  },
+  "platforms": {
+    "instagram": {
+      "enabled": true,
+      "style": "Visual, comunitario e inspirador.",
+      "formats": ["post", "reel", "carousel"]
+    },
+    "facebook": {
+      "enabled": true,
+      "style": "Informativo, participativo y reflexivo.",
+      "formats": ["post", "video"]
+    },
+    "youtube": {
+      "enabled": true,
+      "style": "Educativo, documental y divulgativo.",
+      "formats": ["video", "short"]
+    }
+  }
+}
