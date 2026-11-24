@@ -2,7 +2,7 @@ const { readFileSync, readdirSync, realpathSync, statSync } = require('node:fs')
 const { resolve, join, sep } = require('node:path');
 const { atomicWrite, readRecord } = require('./editorial.cjs');
 const { EditorialError, editorialPlan } = require('./editorial-provider.cjs');
-const prompt = require('./editorial-prompts/v1.json');
+const prompt = require('./editorial-prompts/v2.json');
 
 const layout = {
   instagram: { max_fragments: 3, maxChars: 650, label: 'Una idea para empezar', cta: '¿Qué te llama la atención?' },
@@ -13,6 +13,42 @@ const idPattern = /^[a-z0-9][a-z0-9_-]{0,63}$/;
 const permittedMedia = /^\/files\/incoming\/[a-z0-9][a-z0-9_.-]{0,140}$/i;
 const malicious = /\b(?:(?:ignor[aeá]|omit[íei]|olvid[áa]|override|ignore|desobedec[ée])\b.{0,90}\b(?:instrucciones|reglas|orden(?:es)?|prompt|system|rules|previous|anterior(?:es)?)|(?:system|developer)\s*[:>]|(?:public[áa]|post|reveal|revel[áa]|mostr[áa])\b.{0,90}\b(?:api.?key|secretos|credencial(?:es)?|token(?:s)?|redes sociales))\b/i;
 const simple = value => typeof value === 'string' && value.trim();
+const emojiChars = /[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/u;
+const fillerCopy = /^(?:en un mundo|descubr[ií]|te invitamos|una parada en la agenda|una propuesta de|para compartir con la comunidad)/i;
+
+function cleanCopy(value, maxChars) {
+  if (typeof value !== 'string') return { text: null, reason: 'ausente', removed: [] };
+  let text = value.replace(/\r\n/g, '\n').replace(/[ \t]+\n/g, '\n').replace(/\n{3,}/g, '\n\n').trim();
+  const removed = [];
+  if (/#[\p{L}\p{N}_]{2,40}/u.test(text)) {
+    text = text.replace(/#[\p{L}\p{N}_]{2,40}/gu, '').replace(/[ \t]{2,}/g, ' ').replace(/[ \t]+\n/g, '\n').trim();
+    removed.push('hashtags_modelo_omitidos');
+  }
+  if (emojiChars.test(text)) {
+    text = text.replace(emojiChars, '').replace(/[ \t]{2,}/g, ' ').replace(/[ \t]+\n/g, '\n').trim();
+    removed.push('emojis_modelo_omitidos');
+  }
+  if (!text) return { text: null, reason: 'vacia', removed };
+  if (text.length > maxChars - 100) return { text: null, reason: 'larga', removed };
+  if (/[\u0000-\u001f\u007f]/.test(text.replace(/\n/g, ''))) return { text: null, reason: 'control', removed };
+  if (fillerCopy.test(text)) return { text: null, reason: 'relleno', removed };
+  if (text.split(/\n\n+/).length > 3) return { text: null, reason: 'parrafos', removed };
+  return { text, reason: null, removed };
+}
+
+function contentWords(value) {
+  return new Set(value.toLowerCase().normalize('NFD').replace(/\p{M}/gu, '')
+    .replace(/[^a-z0-9\s]/g, ' ').split(/\s+/).filter(word => word.length > 3));
+}
+
+function coveredByCopy(copy, selected) {
+  const target = contentWords(copy);
+  return selected.every(fragment => {
+    const words = [...contentWords(fragment.text)];
+    if (!words.length) return true;
+    return words.filter(word => target.has(word)).length / words.length >= 0.6;
+  });
+}
 
 function controls(text, flags, warnings) {
   const token = text.normalize('NFD').replace(/\p{M}/gu, '').toLowerCase().trim();
@@ -72,16 +108,14 @@ function contentFragments(record, profile, preferences, warnings) {
 }
 
 function platformMenus(profile, preferences, targets) {
-  const tone = profile.communication?.tone?.join(' ').toLowerCase() ?? '';
-  const style = /cultural/.test(tone) ? 'Una parada en la agenda cultural'
-    : /didáctic|técnic/.test(tone) ? 'Ideas para aprender y experimentar'
-      : /comunitari|reflexiv/.test(tone) ? 'Un espacio para pensar en comunidad' : 'Una propuesta de ' + profile.name;
+  const voice = profile.communication?.style ?? ('Una propuesta de ' + profile.name);
   return Object.fromEntries(targets.map(platform => [platform, {
     ...layout[platform],
     max_fragments: preferences.brief ? 2 : layout[platform].max_fragments,
     format: profile.platforms[platform].formats?.includes('post') ? 'post' : (profile.platforms[platform].formats?.[0] ?? 'post'),
     style: profile.platforms[platform].style ?? '',
-    openings: [style.slice(0, 95), layout[platform].label, ('Desde ' + profile.name).slice(0, 95)],
+    openings: [voice.slice(0, 95), (profile.platforms[platform].style ?? layout[platform].label).slice(0, 95),
+      ('Desde ' + profile.name).slice(0, 95)],
   }]));
 }
 
@@ -89,11 +123,12 @@ function schemaFor(platforms, ids) {
   const shape = { type: 'object', additionalProperties: false, required: Object.keys(platforms), properties: {} };
   for (const [platform, config] of Object.entries(platforms)) {
     shape.properties[platform] = {
-      type: 'object', additionalProperties: false, required: ['opening', 'fragments'],
+      type: 'object', additionalProperties: false, required: ['opening', 'fragments', 'copy'],
       properties: {
         opening: { type: 'integer', enum: [0, 1, 2] },
         fragments: { type: 'array', minItems: 1, maxItems: Math.min(config.max_fragments, ids.length), uniqueItems: true,
           items: { type: 'integer', enum: ids } },
+        copy: { type: 'string', minLength: 1, maxLength: Math.max(1, config.maxChars - 100) },
       },
     };
   }
@@ -117,7 +152,10 @@ function validatePlan(plan, platforms, size, warnings = new Set()) {
   if (!exact(plan.destinations, Object.keys(platforms))) fail('destination_keys');
   for (const [platform, menu] of Object.entries(platforms)) {
     const picked = plan.destinations[platform];
-    if (!exact(picked, ['opening', 'fragments']) || ![0, 1, 2].includes(picked.opening)) fail('destination_shape');
+    const keys = picked && typeof picked === 'object' && !Array.isArray(picked) ? Object.keys(picked) : [];
+    if (!keys.every(key => ['opening', 'fragments', 'copy'].includes(key)) || !keys.includes('opening')
+      || !keys.includes('fragments') || ![0, 1, 2].includes(picked.opening)) fail('destination_shape');
+    if (Object.hasOwn(picked, 'copy') && typeof picked.copy !== 'string') fail('copy_type');
     if (!Array.isArray(picked.fragments)) fail('fragments_type');
     if (picked.fragments.length < 1 || picked.fragments.length > menu.max_fragments) fail('fragments_count');
     if (picked.fragments.some(id => !Number.isSafeInteger(id) || id < 0 || id >= size)) fail('fragment_id');
@@ -183,14 +221,54 @@ function createEditorialEngine({ records, drafts, incoming, provider, vision = f
     const platforms = platformMenus(profile, preferences, targets);
     const images = vision ? imageInput(media, incoming, warnings) : [];
     if (media.some(x => x.type === 'photo') && !images.length) warnings.add('foto_sin_interpretacion_visual');
-    const input = { profile: { name: profile.name, language: profile.communication?.language, tone: profile.communication?.tone,
-      style: profile.communication?.style, restrictions: profile.editorial?.restrictions },
-    fragments, platforms, preferences };
+    const input = {
+      profile: { name: profile.name, project_id: profile.project_id, language: profile.communication?.language,
+        tone: profile.communication?.tone, style: profile.communication?.style, personality: profile.communication?.personality,
+        mission: profile.identity?.mission, values: profile.identity?.values, audience: profile.audience?.description,
+        restrictions: profile.editorial?.restrictions, custom_instructions: profile.editorial?.custom_instructions,
+        narrative_notes: profile.editorial?.narrative_notes },
+      fragments,
+      platforms: Object.fromEntries(targets.map(platform => [platform, { format: platforms[platform].format,
+        style: platforms[platform].style, max_fragments: platforms[platform].max_fragments,
+        max_chars: platforms[platform].maxChars }])),
+      preferences,
+    };
     const { result, attempted, imageUsed } = await editorialPlan(provider, {
       system: prompt.system, input, schema: schemaFor(platforms, fragments.map(x => x.id)), images,
     }, plan => validatePlan(plan, platforms, fragments.length, warnings), stop, wait);
     if (images.length && !imageUsed) warnings.add('foto_sin_interpretacion_visual');
     const generatedAt = new Date(now()).toISOString();
+    const generatedDrafts = targets.map(platform => {
+      const design = platforms[platform];
+      const plan = result.destinations[platform];
+      const parsedCopy = cleanCopy(plan.copy, design.maxChars);
+      let copy = parsedCopy.text;
+      for (const warning of parsedCopy.removed) warnings.add(warning);
+      const selectedFragments = plan.fragments.map(id => fragments[id]);
+      if (copy && !coveredByCopy(copy, selectedFragments)) {
+        copy = null;
+        warnings.add('cobertura_incompleta');
+      }
+      if (plan.copy !== undefined && !copy) {
+        warnings.add('copia_modelo_no_usada');
+        warnings.add('copia_' + parsedCopy.reason);
+      }
+      const opening = (preferences.emojis && platform === 'instagram' ? '✦ ' : '') + design.openings[plan.opening];
+      const lines = [opening];
+      const selected = [];
+      for (const id of plan.fragments) {
+        const fact = fragments[id].text;
+        const value = preferences.bullets ? '• ' + fact : fact;
+        if ([...lines, value].join('\n\n').length > design.maxChars - 100) continue;
+        lines.push(value);
+        selected.push(fact);
+      }
+      if (preferences.call_to_action) lines.push(design.cta);
+      const prefix = preferences.emojis && platform === 'instagram' ? '✦ ' : '';
+      return { draft_id: record.content_id + '-' + platform, platform, format: design.format, status: 'DRAFT',
+        text: copy ? prefix + copy : lines.join('\n\n'),
+        hashtags: preferences.hashtags ? hashtagsFor(profile, selected) : [], media };
+    });
     const output = {
       draft_contract_version: '1.0',
       content_id: record.content_id,
@@ -201,23 +279,7 @@ function createEditorialEngine({ records, drafts, incoming, provider, vision = f
         generated_at: generatedAt, visual_category: imageUsed ? result.visual : null },
       warnings: [...warnings],
       errors: [],
-      drafts: targets.map(platform => {
-        const design = platforms[platform];
-        const plan = result.destinations[platform];
-        const opening = (preferences.emojis && platform === 'instagram' ? '✦ ' : '') + design.openings[plan.opening];
-        const lines = [opening];
-        const selected = [];
-        for (const id of plan.fragments) {
-          const fact = fragments[id].text;
-          const value = preferences.bullets ? '• ' + fact : fact;
-          if ([...lines, value].join('\n\n').length > design.maxChars - 100) continue;
-          lines.push(value);
-          selected.push(fact);
-        }
-        if (preferences.call_to_action) lines.push(design.cta);
-        return { draft_id: record.content_id + '-' + platform, platform, format: design.format, status: 'DRAFT',
-          text: lines.join('\n\n'), hashtags: preferences.hashtags ? hashtagsFor(profile, selected) : [], media };
-      }),
+      drafts: generatedDrafts,
     };
     stop?.throwIfAborted();
     try {

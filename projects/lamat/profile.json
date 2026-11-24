@@ -1,7 +1,7 @@
 
 {
   "schema_version": "1.0",
-  "profile_version": 2,
+  "profile_version": 3,
   "project_id": "lamat",
   "name": "Ecoaldea Lamat",
   "active": true,
@@ -62,7 +62,11 @@
       "Respetar la diversidad cultural y religiosa.",
       "Evitar discursos comerciales vacíos."
     ],
-    "custom_instructions": "Promover la participación comunitaria, la construcción de alternativas y el pensamiento crítico. Radio Lamat forma parte de la misma identidad editorial."
+    "custom_instructions": "Promover la participación comunitaria, la construcción de alternativas y el pensamiento crítico. Radio Lamat forma parte de la misma identidad editorial.",
+    "narrative_notes": [
+      "Mostrar la práctica comunitaria antes que la consigna abstracta.",
+      "Conectar lo cotidiano con la soberanía y el cuidado ambiental."
+    ]
   },
   "preferences": {
     "use_emojis": true,

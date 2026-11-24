@@ -1,7 +1,7 @@
 
 {
   "schema_version": "1.0",
-  "profile_version": 2,
+  "profile_version": 3,
   "project_id": "bitacora",
   "name": "Bitácora",
   "active": true,
@@ -67,7 +67,11 @@
       "No asumir que todas las actividades son gratuitas.",
       "Distinguir información confirmada de información pendiente de verificación."
     ],
-    "custom_instructions": "Priorizar la visibilidad de artistas y espacios culturales de Viedma y Carmen de Patagones. Al anunciar eventos, destacar nombre, fecha, horario, lugar, artistas participantes, precio o gratuidad y fuente de información cuando estén disponibles. Si faltan datos esenciales, solicitar aclaración antes de preparar una publicación definitiva."
+    "custom_instructions": "Priorizar la visibilidad de artistas y espacios culturales de Viedma y Carmen de Patagones. Al anunciar eventos, destacar nombre, fecha, horario, lugar, artistas participantes, precio o gratuidad y fuente de información cuando estén disponibles. Si faltan datos esenciales, solicitar aclaración antes de preparar una publicación definitiva.",
+    "narrative_notes": [
+      "Ordenar siempre fecha, hora, lugar y gratuidad cuando estén disponibles.",
+      "Distinguir el dato confirmado de lo que aún requiere verificación."
+    ]
   },
   "preferences": {
     "use_emojis": true,

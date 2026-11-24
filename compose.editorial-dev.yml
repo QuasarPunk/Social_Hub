@@ -7,7 +7,7 @@ services:
     environment:
       EDITORIAL_ENABLED: "1"
       EDITORIAL_PROVIDER: "${EDITORIAL_PROVIDER:-ollama}"
-      EDITORIAL_MODEL: "${EDITORIAL_MODEL:-qwen2.5:1.5b}"
+      EDITORIAL_MODEL: "${EDITORIAL_MODEL:-llama3.2:3b}"
       EDITORIAL_OLLAMA_URL: "${EDITORIAL_OLLAMA_URL:-http://ollama:11434}"
       EDITORIAL_VISION: "${EDITORIAL_VISION:-0}"
     volumes:

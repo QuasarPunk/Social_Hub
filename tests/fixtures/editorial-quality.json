@@ -1,0 +1,26 @@
+[
+  {
+    "id": "quasarpunk-taller",
+    "project": "quasarpunk",
+    "platforms": ["instagram", "facebook"],
+    "instruction": "Instrucciones: sin hashtags; sin emojis",
+    "text": "QuasarPunk: En la Biblioteca Norte realizamos un taller de electrónica. Se trabajó con una placa Arduino y sensores. Participaron estudiantes y docentes.",
+    "checks": ["Biblioteca Norte", "Arduino", "sensores"]
+  },
+  {
+    "id": "lamat-huerta",
+    "project": "lamat",
+    "platforms": ["instagram", "facebook"],
+    "instruction": "Instrucciones: sin hashtags; sin emojis; breve",
+    "text": "Ecoaldea Lamat: Sembramos plantas nativas en la huerta comunitaria. El encuentro fue abierto y se compartieron semillas. La actividad buscó fortalecer la soberanía alimentaria.",
+    "checks": ["plantas nativas", "huerta comunitaria", "semillas"]
+  },
+  {
+    "id": "bitacora-muestra",
+    "project": "bitacora",
+    "platforms": ["instagram", "facebook"],
+    "instruction": "Instrucciones: sin hashtags; sin emojis; sin llamada a la acción",
+    "text": "Bitácora: La muestra 'Semillas del Sur' se realiza el 14 de junio a las 19:00 en la Sala Cultural de Viedma. Participan artistas locales de música y cerámica. La entrada es gratuita.",
+    "checks": ["14 de junio", "19:00", "Sala Cultural de Viedma", "gratuita"]
+  }
+]

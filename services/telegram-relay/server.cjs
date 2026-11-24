@@ -251,7 +251,7 @@ if (require.main === module) {
         records: options.records, incoming: options.incoming, drafts: '/data/drafts',
         provider: kind === 'template' ? templateProvider : ollamaProvider({
           url: process.env.EDITORIAL_OLLAMA_URL ?? 'http://ollama:11434',
-          model: process.env.EDITORIAL_MODEL ?? 'qwen2.5:1.5b',
+          model: process.env.EDITORIAL_MODEL ?? 'llama3.2:3b',
         }),
         vision: kind === 'ollama' && process.env.EDITORIAL_VISION === '1',
       });

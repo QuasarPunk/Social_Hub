@@ -152,7 +152,8 @@ La instalación principal usa el Telegram Relay como único receptor y SH-01 com
 | **3. Recepción y almacenamiento** | Recepción, almacenamiento y confirmación | **Completada funcionalmente** |
 | **4. Contexto editorial** | Clasificación dinámica, perfiles configurables y selección manual | Desplegada. Texto y selección validados en producción. Verificación de foto real en producción pendiente |
 | **4.1. Captura multimodal y sesiones de contenido** | Captura agrupada de fotos, texto y audio con transcripción configurable | **Completada.** Validada en el entorno principal |
-| **5. Generación con IA** | Borradores contextualizados por perfil y plataforma | SH-03 corregido en desarrollo. Falta la validación final en Telegram; producción sigue en 4.1. [Traspaso](docs/HANDOFF.md#incidencia-sh-03-en-telegram) |
+| **5. Generación con IA** | Borradores contextualizados por perfil y plataforma | **Completada en desarrollo.** SH-03 validado en Telegram e integrado en `main`; producción sigue en 4.1. [Validación](docs/editorial-drafts.md#validación-real-confirmada) |
+| **5.1. Calidad editorial** | Prompt versionado, perfiles enriquecidos y modelo local recomendado | **Completada en rama.** Recomendación `llama3.2:3b` + prompt 2.1; falta validación real y aprobación antes de producción. [Evaluación](docs/editorial-drafts.md#etapa-51-calidad-editorial) |
 | **6. Aprobación** | Aprobar, corregir o descartar desde Telegram | Pendiente |
 | **7. Validación** | Pruebas integrales, manejo de errores y documentación | Pendiente |
 
@@ -189,7 +190,13 @@ Una nota de voz puede identificar un proyecto por su nombre o por un alias de vo
 
 ### Etapa 5 — Motor editorial SH-03
 
-SH-03 genera borradores en español desde registros `CLASSIFIED`, sus perfiles y sus materiales. El proveedor local selecciona fragmentos de la fuente y el motor escribe un lote `DRAFT` para los destinos habilitados. El bot de desarrollo muestra una vista previa con `/borrador`. La incidencia de la vista previa quedó resuelta en desarrollo; la validación final en Telegram y el despliegue en producción siguen pendientes. [Contrato, proveedores y verificación](docs/editorial-drafts.md)
+SH-03 genera borradores en español desde registros `CLASSIFIED`, sus perfiles y sus materiales. El proveedor local selecciona fragmentos de la fuente y el motor escribe un lote `DRAFT` para los destinos habilitados. El bot de desarrollo muestra una vista previa con `/borrador`. La incidencia de la vista previa quedó resuelta y la generación real se validó en `@Test_Social_Hub_bot`; el despliegue en producción sigue pendiente. [Contrato, proveedores y verificación](docs/editorial-drafts.md)
+
+### Etapa 5.1 — Calidad editorial
+
+El prompt sale del perfil y está versionado. La versión 2.1 pide copias redactadas en español, sin hashtags ni emojis, con diferenciación real entre plataformas y cobertura verificable de los hechos. Los perfiles incorporan notas narrativas derivadas de su identidad, sin codificar marcas en workflows. El motor sanea el texto del modelo, advierte omisiones y cae al ensamble trazable cuando es necesario.
+
+En tres capturas ficticias y un equipo sin GPU dedicada, `llama3.2:3b` cubrió los tres casos y respetó todas las restricciones; `qwen2.5:3b` fue menos fiable en los hechos y `qwen2.5:1.5b` resultó el más rápido pero perdió información. La recomendación para desarrollo es `llama3.2:3b` con el prompt 2.1. No se promovió a producción ni se inició la Etapa 6. [Mediciones, ejemplos y límites](docs/editorial-drafts.md#etapa-51-calidad-editorial)
 
 ### Evolución futura (fuera del alcance de 0.1)
 
@@ -280,4 +287,10 @@ La vista previa de `/borrador` fallaba porque el esquema de Ollama permitía ped
 
 ---
 
-**Estado actual:** SH-01, SH-02 y SH-03 están integrados en `main`; la recepción, el almacenamiento, la clasificación y los borradores editoriales quedaron validados en desarrollo. SH-03 no está desplegado en producción. La siguiente mejora planificada es la Etapa 5.1 en `dev/editorial-quality`.
+### 24 de noviembre de 2026 — Etapa 5.1: calidad editorial en rama
+
+Se evaluaron tres modelos locales gratuitos con un conjunto fijo de capturas ficticias de los tres proyectos. `llama3.2:3b` con el prompt 2.1 obtuvo la mejor cobertura de hechos y cumplimiento de restricciones, con 160,4 segundos y 4,944 GiB de memoria en el contenedor de Ollama. La combinación queda como referencia de desarrollo; no está aprobada para producción. Pasaron 66 pruebas de Node.js. [Detalles](docs/editorial-drafts.md#etapa-51-calidad-editorial)
+
+---
+
+**Estado actual:** SH-01, SH-02 y SH-03 están integrados en `main`; la recepción, el almacenamiento, la clasificación y los borradores editoriales quedaron validados en desarrollo. SH-03 no está desplegado en producción. La Etapa 5.1 está cerrada en `dev/editorial-quality` y su recomendación espera validación real y aprobación humana; la Etapa 6 sigue pendiente.

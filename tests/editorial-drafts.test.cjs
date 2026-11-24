@@ -51,7 +51,7 @@ test('SH-03 adapta texto a plataformas, persiste un contrato común y conserva e
   assert.equal(result.profile_version, record.profile_version);
   assert.equal(result.generation.provider, 'fixture');
   assert.equal(result.generation.model, 'spanish-1');
-  assert.equal(result.generation.prompt_version, '1.0');
+  assert.equal(result.generation.prompt_version, '2.1');
   assert.deepEqual(result.drafts.map(x => x.platform), ['instagram', 'facebook']);
   assert.ok(result.drafts.every(x => x.status === 'DRAFT' && x.text.includes('Biblioteca Norte') && x.hashtags.includes('#QuasarPunk')));
   assert.notEqual(result.drafts[0].text, result.drafts[1].text);
@@ -144,6 +144,49 @@ test('el esquema limita fragmentos a los IDs disponibles y exige unicidad', () =
     assert.equal(fragments.maxItems, 2);
     assert.deepEqual(fragments.items.enum, [0, 1]);
   }
+});
+
+test('el esquema pide una copia final por plataforma', () => {
+  const schema = schemaFor({ instagram: { max_fragments: 2, maxChars: 650 } }, [0, 1]);
+  const destination = schema.properties.destinations.properties.instagram;
+  assert.ok(destination.required.includes('copy'));
+  assert.equal(destination.properties.copy.type, 'string');
+});
+
+test('usa la copia redactada por el modelo y conserva la voz del perfil', async t => {
+  const copies = {
+    instagram: 'En la Biblioteca Norte hubo un taller de electrónica. Se trabajó con sensores y una placa Arduino.',
+    facebook: 'En la Biblioteca Norte se realizó un taller de electrónica. Se trabajó con sensores y una placa Arduino.',
+    youtube: 'En la Biblioteca Norte se dictó un taller de electrónica. Se trabajó con sensores y una placa Arduino.',
+  };
+  const f = fixture(t, simulated((plan, query) => {
+    assert.match(query.system, /Diferenciá de verdad/);
+    assert.ok(query.input.profile.mission);
+    assert.ok(query.input.profile.audience);
+    assert.ok(query.input.profile.narrative_notes.length);
+    assert.ok(Object.values(query.input.platforms).every(item => item.style && item.max_chars));
+    return { ...plan, destinations: Object.fromEntries(Object.entries(plan.destinations)
+      .map(([platform, value]) => [platform, { ...value, copy: copies[platform] }])) };
+  }));
+  const { record } = f.input();
+  const result = await f.engine.request(record.content_id);
+  assert.equal(result.generation.prompt_version, '2.1');
+  assert.equal(result.drafts[0].text, '✦ ' + copies.instagram);
+  assert.equal(result.drafts[1].text, copies.facebook);
+  assert.ok(!result.drafts.some(item => item.text.includes('Una propuesta de')));
+  assert.deepEqual(result.warnings, []);
+});
+
+test('limpia hashtags y emojis del modelo sin descartar la copia redactada', async t => {
+  const f = fixture(t, simulated(plan => ({ ...plan, destinations: Object.fromEntries(Object.entries(plan.destinations)
+    .map(([platform, value]) => [platform, { ...value, copy: 'Taller de electrónica en la Biblioteca Norte. Se trabajó con sensores y #QuasarPunk ✦ ' + platform }])) })));
+  const { record } = f.input();
+  const result = await f.engine.request(record.content_id);
+  assert.ok(result.warnings.includes('hashtags_modelo_omitidos'));
+  assert.ok(result.warnings.includes('emojis_modelo_omitidos'));
+  assert.ok(result.drafts.every(item => !item.text.includes('#QuasarPunk')));
+  assert.ok(result.drafts.every(item => !/[\u2726]/.test(item.text.replace(/^✦\s*/u, ''))));
+  assert.ok(result.drafts.every(item => item.text.includes('Taller de electrónica en la Biblioteca Norte')));
 });
 
 test('Ollama recibe el esquema con uniqueItems y el máximo disponible', async () => {

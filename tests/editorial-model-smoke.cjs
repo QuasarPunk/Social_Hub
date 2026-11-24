@@ -31,7 +31,7 @@ async function main() {
     const saved = JSON.stringify(record);
     const path = join(dirs.records, record.content_id + '.json');
     fs.writeFileSync(path, saved);
-    const model = process.env.EDITORIAL_MODEL ?? 'qwen2.5:1.5b';
+    const model = process.env.EDITORIAL_MODEL ?? 'llama3.2:3b';
     const provider = ollamaProvider({ url: 'http://ollama:11434', model });
     const engine = createEditorialEngine({ ...dirs, provider, vision });
     const start = Date.now();

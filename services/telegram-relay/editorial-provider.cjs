@@ -39,7 +39,7 @@ function ollamaProvider({ url, model, timeoutMs = 80000, fetchModel = fetch }) {
           headers: { 'content-type': 'application/json' },
           body: JSON.stringify({
             model, stream: false, format: schema, keep_alive: '2m',
-            options: { temperature: 0, num_ctx: 4096, num_predict: 400 },
+            options: { temperature: 0.2, num_ctx: 4096, num_predict: 1024 },
             messages: [
               { role: 'system', content: system },
               { role: 'user', content: JSON.stringify(input), ...(images.length && { images }) },

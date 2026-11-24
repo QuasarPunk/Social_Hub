@@ -1,7 +1,7 @@
 
 {
   "schema_version": "1.0",
-  "profile_version": 2,
+  "profile_version": 3,
   "project_id": "quasarpunk",
   "name": "QuasarPunk",
   "active": true,
@@ -59,7 +59,11 @@
       "No prometer resultados no comprobados.",
       "Evitar tecnicismos innecesarios."
     ],
-    "custom_instructions": "Estimular la experimentación, el pensamiento crítico y el aprendizaje mediante proyectos reales."
+    "custom_instructions": "Estimular la experimentación, el pensamiento crítico y el aprendizaje mediante proyectos reales.",
+    "narrative_notes": [
+      "Contar la actividad como una experiencia concreta y verificable.",
+      "Preferir el detalle práctico antes que la adjetivación."
+    ]
   },
   "preferences": {
     "use_emojis": true,

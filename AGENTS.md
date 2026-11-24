@@ -16,3 +16,5 @@
 - Antes de integrar SH-03, resolvé la [incidencia de la vista previa](docs/HANDOFF.md#incidencia-sh-03-en-telegram) y validá la respuesta y la persistencia del lote en desarrollo. Registrá códigos de error y contadores sin volcar prompts, respuestas crudas, credenciales ni materiales privados.
 - Después de reiniciar Docker, levantá los entornos con el [arranque diario](docs/development-workflow.md#arranque-diario-de-los-entornos). Producción vuelve sola; desarrollo requiere el Compose con perfiles y no usa `down -v`.
 - Para SH-03, el esquema del proveedor debe limitar `maxItems` a los fragmentos disponibles; si Ollama repite IDs pese a `uniqueItems`, normalizá la selección con advertencia en lugar de persistir un borrador duplicado.
+- El prompt editorial es versionado y sale del perfil: saneá hashtags y emojis que aparezcan en `copy`, verificá cobertura de hechos y caé al ensamble trazable si el texto del modelo omite información verificable.
+- Para la Etapa 5.1 usá `llama3.2:3b` con el prompt 2.1 como referencia local en desarrollo. No lo promovás a producción ni lo presentes como aprobado sin validación real y aprobación humana.
