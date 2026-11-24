@@ -57,6 +57,7 @@ docker run --rm --init --pull never --network none `
   --mount "type=bind,source=$root/tests/n8n-editorial-smoke.cjs,target=/test/tests/n8n-editorial-smoke.cjs,readonly" `
   --mount "type=bind,source=$root/workflows/SH-01-telegram-integrado.json,target=/test/workflows/SH-01-telegram-integrado.json,readonly" `
   --mount "type=bind,source=$root/workflows/SH-02-clasificacion-integrada.json,target=/test/workflows/SH-02-clasificacion-integrada.json,readonly" `
+  --mount "type=bind,source=$root/workflows/SH-03-borradores-editoriales.json,target=/test/workflows/SH-03-borradores-editoriales.json,readonly" `
   --mount "type=bind,source=$root/services/telegram-relay,target=/test/services/telegram-relay,readonly" `
   --mount "type=bind,source=$root/projects,target=/test/projects,readonly" `
   --mount "type=bind,source=$root/scripts/telegram-workflows.cjs,target=/test/scripts/telegram-workflows.cjs,readonly" `

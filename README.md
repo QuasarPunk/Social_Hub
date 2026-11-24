@@ -152,7 +152,7 @@ La instalación principal usa el Telegram Relay como único receptor y SH-01 com
 | **3. Recepción y almacenamiento** | Recepción, almacenamiento y confirmación | **Completada funcionalmente** |
 | **4. Contexto editorial** | Clasificación dinámica, perfiles configurables y selección manual | Desplegada. Texto y selección validados en producción. Verificación de foto real en producción pendiente |
 | **4.1. Captura multimodal y sesiones de contenido** | Captura agrupada de fotos, texto y audio con transcripción configurable | **Completada.** Validada en el entorno principal |
-| **5. Generación con IA** | Borradores contextualizados a partir de texto e imagen | Pendiente |
+| **5. Generación con IA** | Borradores contextualizados por perfil y plataforma | SH-03 implementado en desarrollo. Validación real en Telegram pendiente |
 | **6. Aprobación** | Aprobar, corregir o descartar desde Telegram | Pendiente |
 | **7. Validación** | Pruebas integrales, manejo de errores y documentación | Pendiente |
 
@@ -186,6 +186,10 @@ Los comandos `/nuevo`, `/listo` y `/cancelar` abren, finalizan y cancelan una ca
 La transcripción en desarrollo usa faster-whisper local y un proveedor HTTP configurable. La clasificación editorial comienza al cerrar la captura y obtener las transcripciones necesarias. El contrato de captura agrega los medios agrupados y conserva el contexto editorial de `CLASSIFIED` 1.0. [Arquitectura, contrato y despliegue](docs/multimodal-capture.md)
 
 Una nota de voz puede identificar un proyecto por su nombre o por un alias de voz declarado en el perfil. El relay conserva la selección manual si detecta proyectos distintos o ninguna coincidencia. [Clasificación por voz](docs/multimodal-capture.md#clasificación-por-voz)
+
+### Etapa 5 — Motor editorial SH-03
+
+SH-03 genera borradores en español desde registros `CLASSIFIED`, sus perfiles y sus materiales. El proveedor local selecciona fragmentos de la fuente y el motor escribe un lote `DRAFT` para los destinos habilitados. El bot de desarrollo muestra una vista previa con `/borrador`. [Contrato, proveedores y verificación](docs/editorial-drafts.md)
 
 ### Evolución futura (fuera del alcance de 0.1)
 
