@@ -175,7 +175,7 @@ El [esquema, el contrato y la guía de verificación](docs/editorial-classificat
 
 La validación con el bot de pruebas confirmó la clasificación por identificador y alias, los teclados para contenido sin coincidencias y con dos candidatos, y la persistencia de una fotografía. Telegram aceptó las respuestas a los callbacks y las segundas selecciones conservaron la primera elección. Los siete registros de la sesión cumplieron el contrato `CLASSIFIED` 1.0. [Validación real](docs/editorial-classification.md#validación-real-en-desarrollo)
 
-En el bot principal se verificaron la clasificación automática por identificador y el paso de `PENDING_CLASSIFICATION` a `CLASSIFIED` mediante un teclado real. El respaldo y la comparación posterior al corte confirmaron la conservación del almacenamiento histórico. [Validación principal](docs/editorial-classification.md#validación-del-entorno-principal)
+En el bot principal se verificaron la clasificación automática por identificador y el paso de `PENDING_CLASSIFICATION` a `CLASSIFIED` mediante un teclado real, adem?s de la persistencia de una fotograf?a. El respaldo y la comparación posterior al corte confirmaron la conservación del almacenamiento histórico. [Validación principal](docs/editorial-classification.md#validación-del-entorno-principal)
 
 ### Etapa 4.1 — Captura multimodal y sesiones de contenido
 
