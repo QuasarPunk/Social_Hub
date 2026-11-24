@@ -15,10 +15,28 @@ La Etapa 4.1 está desplegada con n8n 2.48.6. El relay es el único receptor de 
 - La rama `dev/multimodal-capture` implementa la Etapa 4.1. La revisión de audios reales confirmó que los nombres deformados por la transcripción no coincidían con el catálogo anterior. La corrección usa alias de voz exactos y contexto de catálogo en el transcriptor. La Etapa 5 sigue pendiente. [Diagnóstico y solución](multimodal-capture.md#clasificación-por-voz)
 - El entorno principal ya ejecuta la Etapa 4.1 con el overlay multimodal y un único receptor. El respaldo local previo al corte se verificó con SHA-256 y una restauración de SQLite. Los 36 archivos históricos conservaron sus bytes. Pasaron 44 pruebas y el smoke test con n8n 2.48.6. [Procedimiento de despliegue y reversión](multimodal-capture.md#despliegue-futuro-y-reversión)
 - La Etapa 4.1 quedó cerrada. El bot principal confirmó una captura real con foto y voz, transcripción local y clasificación en QuasarPunk con `transcript_match`. n8n leyó ambos originales y el registro con los mismos SHA-256. [Validación en producción](multimodal-capture.md#validación-en-producción)
-- `dev/editorial-ai` incorpora SH-03, su adaptador Ollama, la plantilla local y el contrato de borradores 1.0. La próxima misión es verificar la vista previa de Telegram en desarrollo. Después de verificarla se puede integrar la rama en `main`. [Instalación y prueba](editorial-drafts.md#instalación-y-reversión)
+- `dev/editorial-ai` incorpora SH-03. Las vistas previas reales de Instagram y Facebook fallaron, incluidos los reintentos. La integración en `main` queda pendiente de resolver el defecto y validar Telegram en desarrollo. [Incidencia](#incidencia-sh-03-en-telegram)
 - Pasaron 59 pruebas de Node.js y el smoke test de SH-01, SH-02 y SH-03 con n8n 2.48.6. Qwen2.5 1.5B generó en CPU borradores distintos para Instagram, Facebook y LinkedIn con un perfil ficticio. Para revisar la prueba humana, comprobá que los dos comandos `/borrador` reutilicen el mismo JSON del volumen de borradores y que sigan presentes los originales. [Contrato y verificación](editorial-drafts.md#verificación-y-prueba-humana)
 
 ## Problemas conocidos
+
+### Incidencia SH-03 en Telegram
+
+El bot de desarrollo respondió «No se pudo preparar el borrador. Podés reintentar con /borrador.» a `/borrador instagram` y `/borrador facebook`. El relay, n8n, Ollama y el transcriptor quedaron en ejecución. No se reiniciaron los servicios ni se ejecutaron nuevas inferencias durante el cierre.
+
+**Evidencia sanitizada.** El registro de prueba con una foto y dos materiales de texto está en `CLASSIFIED` 1.0, con perfil 2 e Instagram y Facebook habilitados. No existe un lote en `/data/drafts` para ese registro. Ollama registró varias llamadas `POST /api/chat` con HTTP 200 y tiempos de 10 a 20 segundos. El log del relay no registró un código editorial para esos intentos. La respuesta del bot colapsa varios errores en el mismo mensaje. Un rechazo del JSON del proveedor o del plan por el validador es una hipótesis compatible con estos síntomas. HTTP 200 solo confirma la respuesta del proveedor.
+
+**Primer paso para OpenCode.** En `services/telegram-relay/editorial-preview.cjs`, capturá de forma temporal el código de error saneado del bloque que llama a `editorial.request`. Reproducí una sola vez con una captura ficticia. Registrá etapa, código y conteos, sin imprimir el contenido ni la respuesta cruda del modelo. Si resulta `invalid_provider_response`, distinguí el parseo de Ollama en `editorial-provider.cjs` de la validación de destinos, índices y límites en `editorial-drafts.cjs`. Revisá también qué registro eligió `latest` sin registrar su identificador. El workflow `workflows/SH-03-borradores-editoriales.json` llama al mismo motor mediante la ruta interna autenticada. El comando de Telegram lo invoca directamente.
+
+```powershell
+git switch dev/editorial-ai
+$dev = @('--env-file','.env.example','-p','social-hub-telegram-dev','-f','compose.telegram-dev.yml','-f','compose.editorial-dev.yml','--profile','editorial-model')
+docker compose @dev ps
+docker compose @dev logs --tail 30 telegram-relay ollama
+node --test tests/editorial-drafts.test.cjs
+```
+
+Para reproducir en Telegram de desarrollo, cerrá una captura ficticia clasificada en un proyecto con Instagram y Facebook y ejecutá `/borrador instagram`. Cuando funcione, comprobá que `/borrador facebook` reutilice el lote y que la captura original se conserve. Con la corrección lista, ejecutá la regresión completa antes de integrar. [Contrato y pruebas](editorial-drafts.md#verificación-y-prueba-humana)
 
 - Si Telegram acepta un teclado justo antes de un timeout, un reintento puede mostrar otro teclado para el mismo registro. La primera selección válida se conserva.
 - Los registros clasificados antes del contrato 1.0 conservan su formato y no tienen una revisión editorial histórica asignada por el sistema.

@@ -152,7 +152,7 @@ La instalación principal usa el Telegram Relay como único receptor y SH-01 com
 | **3. Recepción y almacenamiento** | Recepción, almacenamiento y confirmación | **Completada funcionalmente** |
 | **4. Contexto editorial** | Clasificación dinámica, perfiles configurables y selección manual | Desplegada. Texto y selección validados en producción. Verificación de foto real en producción pendiente |
 | **4.1. Captura multimodal y sesiones de contenido** | Captura agrupada de fotos, texto y audio con transcripción configurable | **Completada.** Validada en el entorno principal |
-| **5. Generación con IA** | Borradores contextualizados por perfil y plataforma | SH-03 implementado en desarrollo. Validación real en Telegram pendiente |
+| **5. Generación con IA** | Borradores contextualizados por perfil y plataforma | SH-03 en desarrollo. La vista previa de Telegram falló para Instagram y Facebook. [Traspaso](docs/HANDOFF.md#incidencia-sh-03-en-telegram) |
 | **6. Aprobación** | Aprobar, corregir o descartar desde Telegram | Pendiente |
 | **7. Validación** | Pruebas integrales, manejo de errores y documentación | Pendiente |
 
