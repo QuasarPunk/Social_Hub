@@ -3,11 +3,12 @@ const { classifyRecord, readRecord, saveRecord, atomicWrite } = require('./edito
 
 const MAX_PHOTO = 20 * 1024 * 1024;
 
-async function downloadPhoto(botToken, filePath, fetchTelegram = fetch) {
+async function downloadPhoto(botToken, filePath, fetchTelegram = fetch, stop) {
   if (typeof filePath !== 'string' || !/^(?:[A-Za-z0-9_-]+\/)*[A-Za-z0-9_.-]+$/.test(filePath)
     || ['.', '..'].includes(posix.basename(filePath))) throw new Error('invalid_photo_path');
+  const timeout = AbortSignal.timeout(15000);
   const response = await fetchTelegram('https://api.telegram.org/file/bot' + botToken + '/' + filePath, {
-    redirect: 'error', signal: AbortSignal.timeout(15000),
+    redirect: 'error', signal: stop ? AbortSignal.any([stop, timeout]) : timeout,
   });
   if (!response.ok || !response.body || Number(response.headers.get('content-length')) > MAX_PHOTO) {
     await response.body?.cancel();
@@ -92,12 +93,20 @@ function createIntake({ records, incoming, projects, allowedChats, callTelegram,
   };
 }
 
-async function deliverIntakeReply(update, { records, callTelegram, dispatchMessage }, signal) {
+async function deliverIntakeReply(update, { records, callTelegram, dispatchMessage, capture }, signal) {
   const result = await dispatchMessage(update, signal);
   if (result?.status === 'IGNORED') return;
   const contentId = 'tg-' + update.update_id;
   const chatId = update.message.chat.id;
   if (result?.content_id !== contentId) throw new Error('invalid_workflow_response');
+  if (result.status === 'CAPTURE' && capture) {
+    if (result.notice) {
+      const sent = await callTelegram('sendMessage', { chat_id: chatId, text: result.notice }, 5000, signal);
+      if (!Number.isSafeInteger(sent?.message_id) || sent.message_id < 0) throw new Error('invalid_message_id');
+      capture.markNotice(update);
+    }
+    return;
+  }
   if (result.status === 'UNSUPPORTED') {
     await callTelegram('sendMessage', { chat_id: chatId, text: 'Enviá texto o una fotografía.' }, 5000, signal);
     return;
@@ -106,6 +115,11 @@ async function deliverIntakeReply(update, { records, callTelegram, dispatchMessa
   if (!record || record.chat_id !== chatId || !['PENDING_CLASSIFICATION', 'CLASSIFIED'].includes(record.status)) {
     throw new Error('invalid_workflow_response');
   }
+  await deliverRecordReply(record, { records, callTelegram }, signal);
+}
+
+async function deliverRecordReply(record, { records, callTelegram }, signal) {
+  const contentId = record.content_id;
   if (record.telegram_reply_message_id != null) return;
   const payload = record.status === 'CLASSIFIED'
     ? { text: 'Material recibido. Clasificado en ' + (record.editorial_profile?.name ?? record.project ?? record.project_id) }
@@ -115,9 +129,9 @@ async function deliverIntakeReply(update, { records, callTelegram, dispatchMessa
         text: option.name, callback_data: 'sh:' + contentId + ':' + option.project_id,
       }]) },
     };
-  const sent = await callTelegram('sendMessage', { chat_id: chatId, ...payload }, 5000, signal);
+  const sent = await callTelegram('sendMessage', { chat_id: record.chat_id, ...payload }, 5000, signal);
   if (!Number.isSafeInteger(sent?.message_id) || sent.message_id < 0) throw new Error('invalid_message_id');
-  saveRecord(records, { ...record, telegram_reply_message_id: sent.message_id }, false);
+  saveRecord(records, { ...readRecord(records, contentId), telegram_reply_message_id: sent.message_id }, false);
 }
 
-module.exports = { createIntake, deliverIntakeReply, downloadPhoto };
+module.exports = { createIntake, deliverIntakeReply, deliverRecordReply, downloadPhoto };

@@ -18,7 +18,7 @@ function seedRecord(directory, projects, chat) {
   }, true);
 }
 
-function classify(query, { allowedChats, records, projects }) {
+function classify(query, { allowedChats, records, projects, capture }) {
   const chat = query.message?.chat?.id;
   if (!allowedChats.has(chat)) return 'Chat no autorizado.';
   const data = query.data;
@@ -27,6 +27,8 @@ function classify(query, { allowedChats, records, projects }) {
   const [, contentId, projectId] = match;
   const record = readRecord(records, contentId);
   if (record?.content_id !== contentId || record.chat_id !== chat) return 'Contenido no disponible.';
+  if (record.user_id != null && (query.from?.id !== record.user_id
+    || (capture && !capture.permitted(chat, query.from.id)))) return 'Selección no autorizada.';
   const project = projects.get(projectId);
   if (!project) return 'Proyecto no disponible.';
   if (record.status === 'CLASSIFIED') {
@@ -81,7 +83,10 @@ async function pollCallbacks(options, signal) {
         offset, timeout: 20, allowed_updates: dispatchMessage ? ['message', 'callback_query'] : ['callback_query'],
       }, 25000, signal);
       if (!Array.isArray(updates)) throw new Error('invalid_updates');
-      if (!listening) log(dispatchMessage ? 'Recepción de mensajes y callbacks activa' : 'Recepción de callback_query activa');
+      if (!listening) {
+        log(dispatchMessage ? 'Recepción de mensajes y callbacks activa' : 'Recepción de callback_query activa');
+        options.onListening?.();
+      }
       listening = true;
       for (const update of updates) {
         if (signal.aborted) return;

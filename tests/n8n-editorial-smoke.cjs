@@ -1,13 +1,14 @@
 const assert = require('node:assert/strict');
 const { execFile, spawn } = require('node:child_process');
 const { once } = require('node:events');
-const { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } = require('node:fs');
+const { cpSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } = require('node:fs');
 const { tmpdir } = require('node:os');
 const { join } = require('node:path');
 const { setTimeout: delay } = require('node:timers/promises');
 const { promisify } = require('node:util');
 const { createRelay, telegramCaller, workflowDispatcher } = require('../services/telegram-relay/server.cjs');
 const { createIntake, downloadPhoto } = require('../services/telegram-relay/intake.cjs');
+const { createCapture } = require('../services/telegram-relay/capture.cjs');
 const { loadProjects, pollCallbacks } = require('../services/telegram-relay/callbacks.cjs');
 const { integratedDrafts } = require('../scripts/telegram-workflows.cjs');
 
@@ -45,14 +46,14 @@ async function startN8n() {
   n8nLog = '';
   child = spawn('n8n', ['start'], { env, stdio: ['ignore', 'pipe', 'pipe'] });
   for (const output of [child.stdout, child.stderr]) output.on('data', chunk => { n8nLog = (n8nLog + chunk).slice(-4000); });
-  for (let attempt = 0; attempt < 100 && child.exitCode === null; attempt++) {
+  for (let attempt = 0; attempt < 120 && child.exitCode === null; attempt++) {
     const ready = await fetch(n8n + '/healthz/readiness', { signal: AbortSignal.timeout(500) }).catch(() => null);
     if (ready?.ok) {
       const hook = await fetch(workflowUrl, { method: 'POST', signal: AbortSignal.timeout(1000) }).catch(() => null);
       await hook?.body?.cancel();
       if (hook && hook.status !== 404) return hook.status;
     }
-    await delay(300);
+    await delay(500);
   }
   throw new Error('n8n aislado no inició: ' + n8nLog);
 }
@@ -125,13 +126,15 @@ function fixture() {
   writeFileSync(profilePath, JSON.stringify(newProfile));
 }
 
-async function startRelay(mock, port = 0) {
+async function startRelay(mock, port = 0, captureConfig) {
   const options = { allowedChats, records, incoming, projects: loadProjects(profiles), callTelegram: telegramCaller(token, mock.api) };
-  const intake = createIntake({ ...options, fetchPhoto: path => downloadPhoto(token, path, mock.api) });
+  const fetchMedia = path => downloadPhoto(token, path, mock.api);
+  const capture = captureConfig && createCapture({ ...options, fetchMedia, ...captureConfig });
+  const intake = capture?.ingest ?? createIntake({ ...options, fetchPhoto: fetchMedia });
   relay = createRelay({ botToken: token, relayKey, allowedChats: [chat], intake });
   relay.listen(port, '127.0.0.1');
   await once(relay, 'listening');
-  return { ...options, log: () => {} };
+  return { ...options, capture, log: () => {} };
 }
 
 async function stopRelay() {
@@ -259,6 +262,52 @@ async function main() {
     }, controller.signal), { message: error });
   }
   console.log('n8n 2.48.6: SH-01 y SH-02, clasificación automática/manual, foto, perfiles dinámicos, reinicio, idempotencia y consumidor exclusivo verificados.');
+
+  await stopRelay();
+  const sessions = join(root, 'sessions');
+  mkdirSync(sessions);
+  const captureController = new AbortController();
+  const asOwner = fields => ({ from: { id: chat }, ...fields });
+  const batches = [[
+    message(30, asOwner({ text: '/nuevo' })),
+    message(31, asOwner({ caption: 'QuasarPunk', photo: [{ file_id: 'photo' }], media_group_id: 'fake-album' })),
+    message(32, asOwner({ voice: { file_id: 'voice', duration: 40 } })),
+    message(33, asOwner({ text: '/listo' })),
+  ]];
+  const captureMock = telegramMock(batches, captureController);
+  const multimodal = await startRelay(captureMock, port, {
+    sessions,
+    async transcribe(audio) {
+      assert.deepEqual(audio, photoBytes);
+      return { text: 'Grabación de Radio Lamat', provider: 'fixture' };
+    },
+  });
+  await pollCallbacks({ ...multimodal, dispatchMessage }, AbortSignal.any([captureController.signal, AbortSignal.timeout(30000)]));
+  assert.equal(captureMock.messages.length, 3);
+  assert.equal(readdirSync(records).filter(name => name.startsWith('mm-')).length, 0);
+  await multimodal.capture.tick();
+  const [multimodalFile] = readdirSync(records).filter(name => name.startsWith('mm-'));
+  const grouped = JSON.parse(readFileSync(join(records, multimodalFile)));
+  const button = captureMock.messages.at(-1).reply_markup.inline_keyboard.flat().find(x => x.callback_data.endsWith(':lamat'));
+  assert.equal(grouped.status, 'PENDING_CLASSIFICATION');
+  assert.deepEqual(grouped.capture.materials.map(x => x.type), ['photo', 'voice']);
+  assert.equal(grouped.capture.materials[1].transcription.provider, 'fixture');
+  assert.ok(grouped.capture.materials.every(x => readFileSync(join(incoming, x.media_path.split('/').at(-1))).equals(photoBytes)));
+  await stopRelay();
+  const manualController = new AbortController();
+  const selection = callback(34, button.callback_data);
+  selection.callback_query.from = { id: chat };
+  const manualMock = telegramMock([[selection]], manualController);
+  const recovered = await startRelay(manualMock, port, { sessions });
+  await pollCallbacks({ ...recovered, dispatchMessage }, AbortSignal.any([manualController.signal, AbortSignal.timeout(30000)]));
+  assert.deepEqual(manualMock.answers, ['Clasificado en Ecoaldea Lamat']);
+  const distributed = JSON.parse(readFileSync(join(records, multimodalFile)));
+  assert.equal(distributed.classification_contract_version, '1.0');
+  assert.equal(distributed.capture_contract_version, '1.0');
+  assert.equal(distributed.project_id, 'lamat');
+  assert.deepEqual(distributed.capture, grouped.capture);
+  assert.deepEqual(bytes(5), saved);
+  console.log('n8n 2.48.6: captura multimodal, transcripción simulada, teclado y reinicio verificados.');
 }
 
 main().catch(failure => {

@@ -22,10 +22,16 @@ services:
       TELEGRAM_DEV_CALLBACKS: "${TELEGRAM_DEV_CALLBACKS:-0}"
       TELEGRAM_POLLING: "${TELEGRAM_POLLING:-0}"
       TELEGRAM_EXPECTED_BOT: "Test_Social_Hub_bot"
+      TELEGRAM_MULTIMODAL: "${TELEGRAM_MULTIMODAL:-0}"
+      TELEGRAM_CAPTURE_IDLE_MS: "${TELEGRAM_CAPTURE_IDLE_MS:-90000}"
+      TELEGRAM_CAPTURE_MAX_MS: "${TELEGRAM_CAPTURE_MAX_MS:-600000}"
+      TELEGRAM_TRANSCRIBE_URL: "${TELEGRAM_TRANSCRIBE_URL:-http://transcriber:8090/transcribe}"
+      TELEGRAM_ALLOWED_USERS: "${TELEGRAM_ALLOWED_USERS:-}"
       TELEGRAM_WORKFLOW_URL: "http://n8n:5678/webhook/social-hub/telegram-intake"
     volumes:
       - telegram_records:/data/records
       - telegram_incoming:/data/incoming
+      - telegram_sessions:/data/sessions
       - ./projects:/projects:ro
     init: true
     read_only: true
@@ -40,6 +46,18 @@ services:
     networks:
       - telegram_internal
       - telegram_egress
+
+  transcriber:
+    profiles: [multimodal]
+    build: ./services/transcriber
+    environment:
+      WHISPER_MODEL: "${WHISPER_MODEL:-small}"
+      WHISPER_THREADS: "${WHISPER_THREADS:-4}"
+      HF_HUB_OFFLINE: "1"
+    volumes:
+      - whisper_models:/models
+    networks:
+      - telegram_internal
 
 secrets:
   telegram_bot_token:
@@ -58,3 +76,5 @@ volumes:
   n8n_dev:
   telegram_records:
   telegram_incoming:
+  telegram_sessions:
+  whisper_models:

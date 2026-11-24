@@ -199,6 +199,7 @@ if (require.main === module) {
     }
     const { loadProjects, seedRecord, pollCallbacks } = require('./callbacks.cjs');
     const { createIntake, downloadPhoto } = require('./intake.cjs');
+    const { createCapture, httpTranscriber } = require('./capture.cjs');
     const options = {
       records: '/data/records', incoming: '/data/incoming',
       projects: seed || poll || workflowUrl ? loadProjects('/projects') : undefined,
@@ -206,9 +207,20 @@ if (require.main === module) {
       callTelegram: telegramCaller(botToken),
       log: console.log,
     };
-    const intake = workflowUrl && createIntake({
-      ...options, fetchPhoto: filePath => downloadPhoto(botToken, filePath),
-    });
+    const fetchMedia = (filePath, signal) => downloadPhoto(botToken, filePath, fetch, signal);
+    if (process.env.TELEGRAM_MULTIMODAL === '1') {
+      const userList = process.env.TELEGRAM_ALLOWED_USERS?.trim();
+      const users = userList ? userList.split(/[,\s]+/).map(chatId) : undefined;
+      if (users?.some(id => id === null || id < 0)) throw new Error('invalid_allowed_users');
+      options.capture = createCapture({
+        ...options, sessions: '/data/sessions', fetchMedia, botUsername: expectedBot,
+        allowedUsers: users && new Set(users),
+        idleMs: Number(process.env.TELEGRAM_CAPTURE_IDLE_MS ?? 90000),
+        maxMs: Number(process.env.TELEGRAM_CAPTURE_MAX_MS ?? 600000),
+        transcribe: process.env.TELEGRAM_TRANSCRIBE_URL && httpTranscriber(process.env.TELEGRAM_TRANSCRIBE_URL),
+      });
+    }
+    const intake = workflowUrl && (options.capture?.ingest ?? createIntake({ ...options, fetchPhoto: fetchMedia }));
     const server = createRelay({ botToken, relayKey, allowedChats, intake });
     if (seed) {
       if (options.allowedChats.size !== 1) throw new Error('expected_single_chat');
@@ -216,16 +228,26 @@ if (require.main === module) {
       console.log('Registro de prueba pendiente creado');
     } else if (poll || integrated) {
       const controller = new AbortController();
+      let timer;
+      const startCapture = () => {
+        timer = setInterval(() => {
+          options.capture.tick(controller.signal).catch(() => console.error('No se pudo revisar el almacenamiento de capturas.'));
+        }, 1000);
+      };
       process.once('SIGTERM', () => {
         controller.abort();
+        if (timer) clearInterval(timer);
         server.close();
       });
       server.once('listening', () => {
         const receiver = integrated
-          ? { ...options, expectedBot, dispatchMessage: workflowDispatcher(workflowUrl, relayKey) }
+          ? { ...options, expectedBot, onListening: options.capture && startCapture,
+            dispatchMessage: workflowDispatcher(workflowUrl, relayKey) }
           : options;
         pollCallbacks(receiver, controller.signal).catch(failure => {
           if (controller.signal.aborted) return;
+          controller.abort();
+          if (timer) clearInterval(timer);
           const reason = {
             webhook_active: 'el bot tiene un webhook activo',
             telegram_consumer_conflict: 'Telegram detectó otro consumidor para el bot',
