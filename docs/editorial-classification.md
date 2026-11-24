@@ -92,7 +92,21 @@ Los siete registros finales tuvieron las mismas claves del contrato `CLASSIFIED`
 
 Al cerrar la sesión se recreó el relay con el polling deshabilitado y se retiraron las publicaciones temporales de SH-01 y SH-02. Los siete registros y el JPEG conservaron su contenido después de recrear el contenedor.
 
-## Despliegue principal pendiente
+## Validación del entorno principal
+
+El despliegue de la Etapa 4 usa n8n 2.48.6. Se publicó SH-02 antes de SH-01. El consumidor anterior quedó desactivado, Telegram confirmó la ausencia de su webhook y el relay inició la recepción de mensajes y callbacks. La ruta interna rechazó las solicitudes sin credencial y respondió correctamente con Header Auth.
+
+Se verificó un texto clasificado automáticamente en QuasarPunk y un registro pendiente cuyo teclado fue aceptado por Telegram. Al pulsar Bitácora, el relay recibió el callback, Telegram aceptó `answerCallbackQuery` y el registro quedó en `CLASSIFIED` 1.0 con `project_id: bitacora` y versión de perfil 1.
+
+Se verificó el respaldo con SHA-256 y una restauración de prueba de SQLite. Los 25 registros y 5 archivos históricos del corte conservaron su contenido. Queda pendiente la prueba de una foto nueva con el bot principal. La persistencia de fotografías ya se verificó con el bot de desarrollo y en la integración aislada.
+
+## Revisión del historial
+
+Las exportaciones históricas contenían IDs de chats reales, identificadores de instancia, referencias a workflows y sus versiones, referencias a credenciales de n8n e identificadores de webhooks del antiguo Telegram Trigger. Las copias actuales están saneadas. El historial remoto existente se conserva.
+
+La revisión de los objetos alcanzables desde las referencias locales y remotas no detectó tokens de Telegram ni coincidencias con las claves internas actuales o la clave de cifrado local de n8n. Las referencias a credenciales son identificadores de n8n. La clave interna de desarrollo que apareció en una captura ya fue rotada, y se verificó que el relay rechaza la anterior. No se identificaron credenciales vigentes que requieran rotación prioritaria con la evidencia revisada.
+
+## Procedimiento de despliegue principal
 
 1. Con autorización de corte, respaldá `n8n_data`, la clave de cifrado, los workflows y `storage`. Confirmá que la instancia principal usa n8n 2.48.6. Si usa otra versión, validá la cadena con esa versión antes de recrear n8n. Verificá que el usuario de los contenedores pueda leer los secretos, leer y escribir en `storage/records` y `storage/incoming` y hacer enlaces duros y reemplazos dentro de esos directorios.
 2. Configurá los tres secretos de Compose bajo `secrets/telegram-main/` y `TELEGRAM_EXPECTED_BOT` con el nombre de usuario del bot principal, sin arroba. Validá ambos archivos de Compose con `docker compose -f docker-compose.yml -f compose.telegram-main.yml config --quiet`. Levantá con esos mismos archivos y `up -d --build`, manteniendo `TELEGRAM_POLLING=0`. El overlay reutiliza los directorios existentes.

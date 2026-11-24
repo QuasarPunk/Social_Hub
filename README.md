@@ -2,13 +2,18 @@
 
 **Sistema inteligente y autohospedado de gestión de contenidos para redes sociales**
 
-> **Estado:** En desarrollo · **Versión objetivo:** 0.1 (prototipo) · Clasificación editorial automática y manual verificada con el bot de pruebas · Despliegue principal pendiente
+> **Estado:** En desarrollo · **Versión objetivo:** 0.1 (prototipo) · Etapa 4 desplegada en el entorno principal · Etapa 4.1 planificada
 
 ## ¿Qué es Social Hub?
 
 Social Hub es un proyecto para centralizar y automatizar progresivamente la producción, revisión y distribución de contenido en redes sociales. Su objetivo es transformar materiales en bruto —fotografías, videos, enlaces, audios e instrucciones— en publicaciones adaptadas a cada proyecto y plataforma, reduciendo el trabajo repetitivo sin perder el control editorial humano.
 
 El sistema prioriza herramientas autohospedables, software libre cuando sea posible, costos operativos bajos y una arquitectura modular que pueda ampliarse por etapas.
+
+## Principios de desarrollo
+
+- **Free First.** Social Hub debe poder operar sin depender de servicios pagos. Priorizamos software libre, herramientas gratuitas, modelos abiertos y niveles gratuitos. Probamos opciones locales cuando sean técnicamente viables. No contratamos servicios ni activamos facturación. Si una función no alcanza una calidad razonable con opciones gratuitas, documentamos el límite y las alternativas y seguimos con el trabajo que pueda avanzar. Los proveedores pagos pueden incorporarse como opciones futuras.
+- **Independencia del agente.** Codex, OpenCode u otros agentes pueden retomar el trabajo a partir del repositorio. Cada misión termina con las pruebas y la documentación técnica al día, y con un [traspaso](docs/HANDOFF.md) que registre el estado, el último hito, los pendientes, los problemas conocidos, los comandos de verificación y la próxima misión. Las decisiones y el contexto operativo se conservan en el repositorio.
 
 ## Perfiles editoriales de ejemplo
 
@@ -61,7 +66,7 @@ Si el proyecto no está claro, el sistema deberá pedir una aclaración en lugar
 | **Perfiles editoriales** | Definir estilo y criterios de cada proyecto | Catálogo dinámico y resolución por identificador, alias o selección interactiva |
 | **IA multimodal** | Interpretar material y generar borradores | Pendiente; proveedor/modelo por definir |
 | **Almacenamiento de materiales** | Guardar archivos recibidos y borradores | Operativo: fotografías y registros JSON persistentes |
-| **OpenCode** | Asistencia durante el desarrollo | Herramienta de desarrollo, no servicio de producción |
+| **Codex, OpenCode u otros agentes** | Asistencia intercambiable durante el desarrollo | Contexto y verificación versionados en el repositorio |
 
 La arquitectura procurará mantener separada la entrada de mensajes del procesamiento editorial para poder incorporar WhatsApp u otros canales más adelante.
 
@@ -136,7 +141,7 @@ docker compose exec n8n n8n --version  # Consultar versión instalada
 
 ### Arranque del canal Telegram
 
-La instalación principal usa el Telegram Trigger y su túnel hasta el corte autorizado de la Etapa 4. El circuito integrado usa un receptor por bot y una ruta interna en n8n. El procedimiento de despliegue describe el corte entre ambos. [Despliegue principal](docs/editorial-classification.md#despliegue-principal-pendiente)
+La instalación principal usa el Telegram Relay como único receptor y SH-01 como ruta interna autenticada en n8n. El procedimiento técnico documenta el corte y la reversión al consumidor anterior. [Despliegue principal](docs/editorial-classification.md#procedimiento-de-despliegue-principal)
 
 ## Hoja de ruta
 
@@ -145,7 +150,8 @@ La instalación principal usa el Telegram Trigger y su túnel hasta el corte aut
 | **1. Infraestructura** | Docker, Compose, n8n Community, configuración y persistencia | **Completada** |
 | **2. Telegram** | Bot, webhook HTTPS, filtro por chat y respuesta | **Completada** (exportación del workflow pendiente como tarea documental) |
 | **3. Recepción y almacenamiento** | Recepción, almacenamiento y confirmación | **Completada funcionalmente** |
-| **4. Contexto editorial** | Clasificación dinámica, perfiles configurables y selección manual | Validada en desarrollo con Telegram real. Despliegue principal pendiente |
+| **4. Contexto editorial** | Clasificación dinámica, perfiles configurables y selección manual | Desplegada. Texto y selección validados en producción. Verificación de foto real en producción pendiente |
+| **4.1. Captura multimodal y sesiones de contenido** | Captura agrupada de fotos, texto y audio con transcripción configurable | Planificada |
 | **5. Generación con IA** | Borradores contextualizados a partir de texto e imagen | Pendiente |
 | **6. Aprobación** | Aprobar, corregir o descartar desde Telegram | Pendiente |
 | **7. Validación** | Pruebas integrales, manejo de errores y documentación | Pendiente |
@@ -168,6 +174,16 @@ Objetivo: identificar un proyecto registrado y cargar su configuración editoria
 El [esquema, el contrato y la guía de verificación](docs/editorial-classification.md) registran la implementación y vinculan las pruebas con estos ocho criterios.
 
 La validación con el bot de pruebas confirmó la clasificación por identificador y alias, los teclados para contenido sin coincidencias y con dos candidatos, y la persistencia de una fotografía. Telegram aceptó las respuestas a los callbacks y las segundas selecciones conservaron la primera elección. Los siete registros de la sesión cumplieron el contrato `CLASSIFIED` 1.0. [Validación real](docs/editorial-classification.md#validación-real-en-desarrollo)
+
+En el bot principal se verificaron la clasificación automática por identificador y el paso de `PENDING_CLASSIFICATION` a `CLASSIFIED` mediante un teclado real. El respaldo y la comparación posterior al corte confirmaron la conservación del almacenamiento histórico. [Validación principal](docs/editorial-classification.md#validación-del-entorno-principal)
+
+### Etapa 4.1 — Captura multimodal y sesiones de contenido
+
+La siguiente misión, previa a la Etapa 5, agrupará fotografías, textos, notas de voz y archivos de audio consecutivos en una sesión persistente por usuario y chat. La captura automática cerrará tras **90 segundos de inactividad** por defecto, con una ventana y una duración máxima configurables. Cada material nuevo reiniciará el contador de inactividad sin extender la duración máxima de la sesión.
+
+Los comandos `/nuevo`, `/listo` y `/cancelar` abrirán, finalizarán y cancelarán una captura, respectivamente. Una sesión explícita iniciada con `/nuevo` debe admitir notas de voz largas sin cerrarse prematuramente por las reglas de captura automática.
+
+La transcripción usará un proveedor configurable, con prioridad para opciones gratuitas y locales. La clasificación editorial de los materiales agrupados empezará cuando la captura esté cerrada y todas las transcripciones necesarias estén disponibles. Las sesiones deberán recuperarse tras reinicios, evitar el procesamiento duplicado y conservar la compatibilidad con los registros históricos y el circuito existente. [Próxima misión y criterios de prueba](docs/HANDOFF.md#próxima-misión-de-la-etapa-41)
 
 ### Evolución futura (fuera del alcance de 0.1)
 
