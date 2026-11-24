@@ -98,7 +98,7 @@ El despliegue de la Etapa 4 usa n8n 2.48.6. Se publicó SH-02 antes de SH-01. El
 
 Se verificó un texto clasificado automáticamente en QuasarPunk y un registro pendiente cuyo teclado fue aceptado por Telegram. Al pulsar Bitácora, el relay recibió el callback, Telegram aceptó `answerCallbackQuery` y el registro quedó en `CLASSIFIED` 1.0 con `project_id: bitacora` y versión de perfil 1.
 
-Se verificó el respaldo con SHA-256 y una restauración de prueba de SQLite. Los 25 registros y 5 archivos históricos del corte conservaron su contenido. Queda pendiente la prueba de una foto nueva con el bot principal. La persistencia de fotografías ya se verificó con el bot de desarrollo y en la integración aislada.
+Se verificó una fotografía nueva clasificada en QuasarPunk con el contrato 1.0 y la revisión 1 del perfil. n8n leyó el mismo JPEG y el mismo registro persistidos. El respaldo se verificó con SHA-256 y una restauración de prueba de SQLite. Los 25 registros y 5 archivos históricos conservaron su contenido. La Etapa 4 quedó cerrada.
 
 ## Revisión del historial
 

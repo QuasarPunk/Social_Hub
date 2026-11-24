@@ -11,7 +11,7 @@ La Etapa 4 está desplegada con n8n 2.48.6. El relay es el único receptor de Te
 ## Último hito y pendientes
 
 - Pasaron la matriz de ocho criterios, la suite de regresión y la integración aislada. El bot de desarrollo comprobó texto, foto, clasificación por identificador y alias, teclados ambiguos e idempotencia.
-- En el bot principal se verificaron la clasificación automática y la selección manual, con respuesta de Telegram a los callbacks. Los 25 registros y 5 archivos históricos del corte conservaron sus bytes. Tambi?n se verific? una foto nueva, su clasificaci?n autom?tica y su lectura desde n8n. La Etapa 4 qued? cerrada.
+- En el bot principal se verificaron la clasificación automática, la selección manual y la persistencia de una fotografía que n8n pudo leer. Los 25 registros y 5 archivos históricos conservaron sus bytes. La Etapa 4 quedó cerrada.
 - La siguiente misión es implementar la Etapa 4.1 en desarrollo. La Etapa 5 sigue pendiente.
 
 ## Problemas conocidos
