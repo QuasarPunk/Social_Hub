@@ -5,7 +5,7 @@
 | Alternativa | Acceso y condiciones | Decisión |
 | --- | --- | --- |
 | Ollama local con Qwen2.5 1.5B | Modelo abierto Apache 2.0 cuantizado Q4_K_M y multilingüe. El archivo pesa unos 986 MB. Se probó Ollama 0.13.5 en CPU. | Modelo de la validación original de SH-03 y referencia de velocidad. Generó un lote válido en español para Instagram, Facebook y LinkedIn en 40,8 segundos con texto y voz transcrita. Opera en la red privada, con nube deshabilitada y sin clave ni cuota de API. [Modelo](https://ollama.com/library/qwen2.5:1.5b) · [Esquemas JSON](https://docs.ollama.com/capabilities/structured-outputs) |
-| Ollama local con Llama 3.2 3B | Modelo abierto bajo licencia Llama 3.2, cuantizado y ejecutado en CPU. | Recomendado para desarrollo desde la Etapa 5.1 con el prompt 2.1. Tuvo la mejor cobertura de hechos y cumplimiento de restricciones en las tres capturas ficticias. No está aprobado para producción. [Modelo](https://ollama.com/library/llama3.2:3b) |
+| Ollama local con Llama 3.2 3B | Modelo abierto bajo licencia Llama 3.2, cuantizado y ejecutado en CPU. | Recomendado para desarrollo desde la Etapa 5.1. Ganó la comparación inicial con el prompt 2.1 y se revalidó con el prompt 3.2 en los tres casos de la corrección v3. No está aprobado para producción. [Modelo](https://ollama.com/library/llama3.2:3b) |
 | Ollama local con Qwen2.5 3B | Modelo abierto Apache 2.0, cuantizado y ejecutado en CPU. | Evaluado en la Etapa 5.1. Diferenció mejor las plataformas, pero omitió hechos verificables e introdujo hashtags y emojis que el motor saneó. [Modelo](https://ollama.com/library/qwen2.5:3b) |
 | Ollama local con Qwen3-VL 2B | Modelo abierto cuantizado con visión, de unos 1,9 GB. La variante inicial agotó los tokens en razonamiento y devolvió un mensaje sin JSON. | El adaptador acepta visión opcional. El modo de validación usa descripciones y transcripciones hasta verificar otro modelo visual con el esquema y la latencia del equipo. [Modelo](https://ollama.com/library/qwen3-vl:2b-instruct) · [Visión](https://docs.ollama.com/capabilities/vision) |
 | Gemini API gratuita | Requiere clave y un proyecto compatible. El acceso a modelos es limitado y las cuotas varían por modelo y proyecto en solicitudes y tokens. La política del nivel gratuito advierte que el contenido puede usarse para mejorar productos. | Alternativa evaluada por documentación. Para considerar un adaptador, verificar la cuota vigente de la cuenta y usar fixtures antes de autorizar el envío de datos. [Precios](https://ai.google.dev/gemini-api/docs/pricing) · [Cuotas](https://ai.google.dev/gemini-api/docs/rate-limits) |
@@ -121,7 +121,7 @@ docker exec social-hub-telegram-dev-ollama-1 bash -lc "df -h /; lspci 2>/dev/nul
 
 - Prompt versionado `services/telegram-relay/editorial-prompts/v2.json`, versión **2.1**. Pide texto redactado, no meras citas; separa hechos de interpretación; prohíbe hashtags, emojis, inventarios y preguntas finales cuando la instrucción lo indica; y exige aperturas, order y longitudes distintas por plataforma.
 - Perfiles `projects/*/profile.json` en `profile_version: 3`. Agregan `editorial.narrative_notes` con dos pistas narrativas derivadas de la identidad existente. No se cambiaron nombres, alias, tono, audiencia, temas, restricciones ni plataformas.
-- `editorial-drafts.cjs` pasa esas notas al `input`, carga el prompt 2.1, exige `copy` en el esquema del proveedor y conserva compatibilidad con el proveedor determinista mediante `copy` opcional en `validatePlan`.
+- `editorial-drafts.cjs` pasa esas notas al `input`, carga el prompt versionado (2.1 en la comparación inicial y 3.2 desde la corrección v3), exige `copy` en el esquema del proveedor y conserva compatibilidad con el proveedor determinista mediante `copy` opcional en `validatePlan`.
 - `cleanCopy` elimina hashtags, emojis, prefijos de rol, cercos de código y repetición del prompt. `contentWords` y `coveredByCopy` comparan la copia con los hechos extraídos. Ante omisión, se usa el ensamble trazable y se registra `cobertura_incompleta`.
 - `platformMenus` usa `editorial.style` y los estilos por plataforma del perfil. `editorial-provider.cjs` baja `temperature` a `0.2` y eleva `num_predict` a `1024`.
 - `compose.editorial-dev.yml` y los smoke tests toman `llama3.2:3b` como modelo predeterminado de desarrollo.
@@ -193,3 +193,44 @@ La recomendación no implica aprobación de calidad editorial ni despliegue. Fal
 - `qwen3-vl:2b` quedó fuera de esta comparación: el cupo de tres modelos se usó para los modelos de texto. No se evaluó visión real.
 - Las métricas dependen de una CPU sin GPU y de una sola corrida por modelo; no son comparables con otro equipo ni garantizan resultados idénticos.
 - El prompt y las notas narrativas no sustituyen la revisión humana. Ningún borrador debe publicarse automáticamente en esta versión.
+
+## Corrección v3: intención, contrato y saneamiento
+
+La validación real con prompt 2.1 mostró que una solicitud de tema podía tratarse como hecho documental. El motor repetía la instrucción, usaba una apertura genérica y agregaba pregunta final y hashtag. La corrección no cambia el modelo recomendado ni promueve la combinación a producción.
+
+### Arquitectura v3
+
+- `interpretIntent(record, profile, warnings)` separa hechos documentales, temas, instrucciones y restricciones. El modo resultante es `documental`, `generativo` o `mixto`, y viaja al proveedor junto con `topics`, `facts`, `directives` y `restrictions` en `input.intent`.
+- El prompt `editorial-prompts/v3.json` está en versión `3.2`. `generation.prompt_version` registra la versión efectiva, junto con `provider`, `model`, `mode`, `topics`, `provenance`, `attempted`, `generated_at` y `duration_ms`.
+- El esquema exige `destinations` y `visual`. Cada destino tiene `copy` y `fragments`; desaparecieron `opening` y `cta`. `maxItems` sigue limitado a los IDs disponibles y `uniqueItems` se mantiene.
+- La comprobación rígida del 60 % de cobertura se reemplazó por advertencias `fidelity_review` y `fidelity_numbers_review`. La comparación numérica acepta equivalentes como `doce` y `12`.
+- `cleanCopy` sanea hashtags y emojis según preferencias, elimina la instrucción literal, frases genéricas como «En este post», «Descubre», «Aprende», «Te explicamos», «proyecto innovador» o «experiencias únicas», CTA no solicitadas y artefactos del modelo. Cada cambio se declara en `warnings`.
+- `editorial-provider.cjs` mantiene el proveedor determinista como respaldo explícito: su salida se identifica como `template_fallback` y no reemplaza en silencio una copia válida del modelo.
+- `capture.pending(chat,user)` bloquea `/borrador` mientras haya una captura `OPEN`, `SEALED` o `FAILED`, con un mensaje que indica `/listo` o esperar la confirmación.
+
+### Ejecución reproducible
+
+```powershell
+node --test tests/*.test.cjs
+$dev = @('--env-file','.env.example','-p','social-hub-telegram-dev','-f','compose.telegram-dev.yml','-f','compose.editorial-dev.yml','--profile','multimodal','--profile','editorial-model')
+docker compose @dev up -d --no-deps --build telegram-relay
+docker exec social-hub-telegram-dev-telegram-relay-1 node /data/sessions/validate-v3-editorial.cjs
+```
+
+El harness usa registros ficticios, instala el proveedor Ollama dentro del relay y escribe solo en `/data/sessions/editorial-v3-validation`. No usa credenciales, no envía mensajes y no toca producción.
+
+### Resultados
+
+| Caso | Modo | Intento | Duración | Advertencias |
+| --- | --- | ---: | ---: | --- |
+| Botones pulsadores y Arduino | `generativo` | 1 | 35.956 ms | Ninguna |
+| Taller de compostaje con doce participantes | `documental` | 1 | 43.148 ms | Ninguna |
+| Sensor ultrasónico HC-SR04 en robótica | `mixto` | 1 | 36.593 ms | `frases_genericas_omitidas`, `emojis_modelo_omitidos` |
+
+Los tres lotes quedaron en `DRAFT`, con `provider=ollama`, `model=llama3.2:3b`, `prompt_version=3.2` y `provenance=model`. Las copias conservaron los hechos aportados, no repitieron la instrucción, no incluyeron hashtags ni emojis en el texto cuando correspondía y no agregaron pregunta final. Los textos definitivos de esa corrida quedan en el volumen aislado de validación; este documento no reproduce respuestas crudas.
+
+### Límites
+
+- La salida del modelo es no determinista: en corridas intermedias hicieron falta dos intentos o saneamiento adicional. El motor reintenta una vez y registra el resultado saneado; no garantiza una redacción idéntica.
+- El saneamiento preserva el contenido del modelo, pero puede dejar fórmulas menos naturales cuando el modelo insiste en frases prohibidas. La revisión humana sigue siendo obligatoria.
+- La validación real con `@Test_Social_Hub_bot` y la aprobación editorial siguen pendientes. No hay integración en `main`, despliegue en producción ni Etapa 6.

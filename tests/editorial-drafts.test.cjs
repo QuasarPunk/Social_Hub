@@ -4,7 +4,7 @@ const { tmpdir } = require('node:os');
 const { join } = require('node:path');
 const { once } = require('node:events');
 const { test } = require('node:test');
-const { createEditorialEngine, schemaFor } = require('../services/telegram-relay/editorial-drafts.cjs');
+const { createEditorialEngine, schemaFor, interpretIntent } = require('../services/telegram-relay/editorial-drafts.cjs');
 const { EditorialError, ollamaProvider, templateProvider } = require('../services/telegram-relay/editorial-provider.cjs');
 const { createRelay } = require('../services/telegram-relay/server.cjs');
 const { startEditorialPreview } = require('../services/telegram-relay/editorial-preview.cjs');
@@ -51,7 +51,7 @@ test('SH-03 adapta texto a plataformas, persiste un contrato común y conserva e
   assert.equal(result.profile_version, record.profile_version);
   assert.equal(result.generation.provider, 'fixture');
   assert.equal(result.generation.model, 'spanish-1');
-  assert.equal(result.generation.prompt_version, '2.1');
+  assert.equal(result.generation.prompt_version, '3.2');
   assert.deepEqual(result.drafts.map(x => x.platform), ['instagram', 'facebook']);
   assert.ok(result.drafts.every(x => x.status === 'DRAFT' && x.text.includes('Biblioteca Norte') && x.hashtags.includes('#QuasarPunk')));
   assert.notEqual(result.drafts[0].text, result.drafts[1].text);
@@ -155,12 +155,12 @@ test('el esquema pide una copia final por plataforma', () => {
 
 test('usa la copia redactada por el modelo y conserva la voz del perfil', async t => {
   const copies = {
-    instagram: 'En la Biblioteca Norte hubo un taller de electrónica. Se trabajó con sensores y una placa Arduino.',
-    facebook: 'En la Biblioteca Norte se realizó un taller de electrónica. Se trabajó con sensores y una placa Arduino.',
-    youtube: 'En la Biblioteca Norte se dictó un taller de electrónica. Se trabajó con sensores y una placa Arduino.',
+    instagram: 'En la Biblioteca Norte hubo un taller de electrónica con sensores y una placa Arduino. La actividad acercó la electrónica a la comunidad y dejó material para seguir conversando.',
+    facebook: 'En la Biblioteca Norte se realizó un taller de electrónica con sensores y una placa Arduino. La actividad acercó la electrónica a la comunidad y dejó material para seguir conversando.',
   };
   const f = fixture(t, simulated((plan, query) => {
-    assert.match(query.system, /Diferenciá de verdad/);
+    assert.match(query.system, /No repitas la instrucción/);
+    assert.match(query.system, /modo generativo/);
     assert.ok(query.input.profile.mission);
     assert.ok(query.input.profile.audience);
     assert.ok(query.input.profile.narrative_notes.length);
@@ -170,8 +170,8 @@ test('usa la copia redactada por el modelo y conserva la voz del perfil', async 
   }));
   const { record } = f.input();
   const result = await f.engine.request(record.content_id);
-  assert.equal(result.generation.prompt_version, '2.1');
-  assert.equal(result.drafts[0].text, '✦ ' + copies.instagram);
+  assert.equal(result.generation.prompt_version, '3.2');
+  assert.equal(result.drafts[0].text, copies.instagram);
   assert.equal(result.drafts[1].text, copies.facebook);
   assert.ok(!result.drafts.some(item => item.text.includes('Una propuesta de')));
   assert.deepEqual(result.warnings, []);
@@ -179,7 +179,7 @@ test('usa la copia redactada por el modelo y conserva la voz del perfil', async 
 
 test('limpia hashtags y emojis del modelo sin descartar la copia redactada', async t => {
   const f = fixture(t, simulated(plan => ({ ...plan, destinations: Object.fromEntries(Object.entries(plan.destinations)
-    .map(([platform, value]) => [platform, { ...value, copy: 'Taller de electrónica en la Biblioteca Norte. Se trabajó con sensores y #QuasarPunk ✦ ' + platform }])) })));
+    .map(([platform, value]) => [platform, { ...value, copy: 'Taller de electrónica en la Biblioteca Norte. Se trabajó con sensores y una placa Arduino para probar nuevas ideas. #QuasarPunk ✦ ' + platform }])) })));
   const { record } = f.input();
   const result = await f.engine.request(record.content_id);
   assert.ok(result.warnings.includes('hashtags_modelo_omitidos'));
@@ -203,10 +203,11 @@ test('Ollama recibe el esquema con uniqueItems y el máximo disponible', async (
 
 test('normaliza IDs repetidos sin reintentar ni duplicar citas', async t => {
   let attempts = 0;
+  const copy = 'En la Biblioteca Norte se realizó un taller de electrónica con sensores y una placa Arduino para la comunidad.';
   const duplicated = {
     destinations: {
-      instagram: { opening: 0, fragments: [0, 0] },
-      facebook: { opening: 1, fragments: [0] },
+      instagram: { copy, fragments: [0, 0] },
+      facebook: { copy, fragments: [0] },
     },
     visual: 'sin determinar',
   };
@@ -349,4 +350,79 @@ test('Telegram permite pedir una vista previa solo al dueño y envía solo el bo
   assert.equal(result.method, 'sendMessage');
   assert.equal(result.payload.chat_id, record.chat_id);
   assert.match(result.payload.text, /^Borrador para facebook/);
+});
+
+test('/borrador no reutiliza un registro anterior durante una captura activa', async t => {
+  const f = fixture(t);
+  const { record } = f.input();
+  await f.engine.request(record.content_id);
+  const sent = Promise.withResolvers();
+  const options = { capture: { permitted: () => true, pending: () => true }, editorial: f.engine, log() {},
+    async callTelegram(_method, payload) { sent.resolve(payload.text); } };
+  assert.ok(startEditorialPreview({ chat: { id: record.chat_id }, from: { id: record.user_id }, text: '/borrador' },
+    options, new AbortController().signal));
+  assert.match(await sent.promise, /captura abierta o en proceso/);
+});
+
+test('separa hechos, temas y restricciones en los tres modos con salidas completas', async t => {
+  const f = fixture(t, simulated());
+  const cases = [
+    {
+      id: 'gen-botones', project: 'quasarpunk', mode: 'generativo',
+      instruction: 'Hace una publicación para QuasarPunk explicando qué son los botones pulsadores y cómo podemos utilizarlos con Arduino',
+      expected: /bot[oó]n pulsador|Arduino/i, forbidden: /Hace una publicaci[oó]n/i,
+    },
+    {
+      id: 'doc-compostaje', project: 'lamat', mode: 'documental',
+      instruction: 'Hoy realizamos un taller de compostaje con doce participantes. Prepará una publicación cálida, sin emojis ni hashtags',
+      expected: /doce participantes/i, forbidden: /Prepar[aá] una publicaci[oó]n/i,
+    },
+    {
+      id: 'mix-sensor', project: 'quasarpunk', mode: 'mixto',
+      instruction: 'Hoy utilizamos un sensor ultrasónico HC-SR04 en nuestro taller. Explicá brevemente cómo funciona y para qué sirve en robótica',
+      expected: /HC-SR04|ultrasonido/i, forbidden: /Explic[aá] brevemente/i,
+    },
+  ];
+  for (const item of cases) {
+    const { record } = f.input(item.project, { content_id: item.id, instruction: item.instruction });
+    const intent = interpretIntent(record, require('../projects/' + item.project + '/profile.json'), new Set());
+    assert.equal(intent.mode, item.mode);
+    if (item.mode === 'generativo') assert.deepEqual(intent.facts, []);
+    if (item.mode !== 'generativo') assert.ok(intent.facts.length);
+    const result = await f.engine.request(item.id);
+    assert.equal(result.generation.mode, item.mode);
+    assert.equal(result.generation.prompt_version, '3.2');
+    assert.equal(result.generation.provenance, 'model');
+    assert.ok(Array.isArray(result.generation.topics));
+    assert.ok(result.generation.duration_ms >= 0);
+    assert.ok(result.generation.generated_at);
+    if (item.mode === 'documental') assert.ok(result.drafts.every(draft => draft.hashtags.length === 0));
+    for (const draft of result.drafts) {
+      assert.equal(draft.status, 'DRAFT');
+      assert.ok(draft.text.length >= 100);
+      assert.match(draft.text, item.expected);
+      assert.ok(!item.forbidden.test(draft.text));
+    }
+  }
+});
+
+test('rechaza la instrucción literal y sanea frases genéricas sin abandonar la copia del modelo', async t => {
+  const instruction = 'Hace una publicación para QuasarPunk explicando qué son los botones pulsadores y cómo podemos utilizarlos con Arduino';
+  const repeat = fixture(t, simulated(plan => ({ ...plan, destinations: Object.fromEntries(Object.entries(plan.destinations)
+    .map(([platform, value]) => [platform, { ...value, copy: instruction }])) })));
+  repeat.input('quasarpunk', { instruction });
+  await assert.rejects(repeat.engine.request('fake-content'), { code: 'invalid_provider_response', reason: 'copy_literal_instruction' });
+  const raw = 'Los botones pulsadores permiten crear interfaces interactivas con Arduino. En este post, exploramos cómo se conectan al circuito y cómo registran una pulsación. ¿Qué te gustaría sumar?';
+  const polished = fixture(t, simulated(plan => ({ ...plan, destinations: Object.fromEntries(Object.entries(plan.destinations)
+    .map(([platform, value]) => [platform, { ...value, copy: raw }])) })));
+  polished.input();
+  const result = await polished.engine.request('fake-content');
+  assert.equal(result.generation.provenance, 'model');
+  assert.ok(result.warnings.includes('frases_genericas_omitidas'));
+  assert.ok(result.warnings.includes('llamada_accion_omitida'));
+  for (const draft of result.drafts) {
+    assert.match(draft.text, /botones pulsadores/);
+    assert.doesNotMatch(draft.text, /en este post|descubre|aprende|te explicamos|¿/i);
+    assert.ok(!draft.text.includes('¿'));
+  }
 });

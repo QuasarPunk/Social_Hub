@@ -21,6 +21,10 @@ function startEditorialPreview(message, { capture, editorial, callTelegram, expe
       await reply('Usá /borrador, /borrador instagram, /borrador facebook o /borrador linkedin.');
       return;
     }
+    if (capture?.pending?.(chat_id, user)) {
+      await reply('Hay una captura abierta o en proceso. Cerrala con /listo o esperá la confirmación antes de pedir /borrador.');
+      return;
+    }
     const id = editorial.latest(chat_id, user);
     if (!id) {
       await reply('Todavía no hay una captura clasificada. Cerrala con /listo y esperá la confirmación.');

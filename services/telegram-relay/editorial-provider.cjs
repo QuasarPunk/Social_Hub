@@ -66,13 +66,59 @@ function ollamaProvider({ url, model, timeoutMs = 80000, fetchModel = fetch }) {
   };
 }
 
+function lowerFirst(value) {
+  return value.charAt(0).toLowerCase() + value.slice(1);
+}
+
+function templateCopy(input, platform, selected = input.fragments) {
+  const name = input.profile?.name ?? 'El proyecto';
+  const mode = input.intent?.mode ?? 'documental';
+  const topic = input.intent?.topics?.[0];
+  const facts = Array.isArray(selected) ? selected.map(item => item.text).filter(Boolean) : [];
+  const preferences = input.preferences ?? {};
+  const topicOpen = {
+    instagram: `En ${name} miramos de cerca ${topic}.`,
+    facebook: `Desde ${name} compartimos una explicación sobre ${topic}.`,
+    linkedin: `En ${name} abordamos ${topic} desde una perspectiva práctica.`,
+  };
+  const factOpen = {
+    instagram: `En ${name} compartimos este material.`,
+    facebook: `Desde ${name} compartimos este material con la comunidad.`,
+    linkedin: `Desde ${name} presentamos este material como parte de nuestro trabajo.`,
+  };
+  const close = {
+    instagram: `Es una forma de acercar estos contenidos a quienes acompañan ${name}.`,
+    facebook: `Queda abierto el espacio para seguir conversando sobre este material de ${name}.`,
+    linkedin: `Este material suma contexto a la labor de ${name} y a sus conversaciones con la comunidad.`,
+  };
+  const sentences = [];
+  if ((mode === 'generativo' || mode === 'mixto') && topic) {
+    const normalized = String(topic).toLowerCase().normalize('NFD').replace(/\p{M}/gu, '');
+    sentences.push(topicOpen[platform] ?? topicOpen.instagram);
+    if (/(boton|pulsador|arduino|electron)/.test(normalized)) {
+      sentences.push('Un botón pulsador cierra o abre un circuito al accionarlo; con Arduino permite convertir una acción en una señal que el programa puede leer.');
+    } else if (/(sensor|ultraso|hc.?sr04|robot)/.test(normalized)) {
+      sentences.push('Un sensor de ultrasonido emite una onda y calcula una distancia según el tiempo que tarda en volver el eco; en robótica ayuda a medir proximidad y evitar obstáculos.');
+    } else {
+      sentences.push('La explicación se apoya en ejemplos generales y aplicaciones concretas, sin atribuirle al proyecto actividades que no fueron informadas.');
+    }
+    if (facts.length) sentences.push('Como punto de partida, ' + lowerFirst(facts.join(' ')));
+  } else {
+    sentences.push(factOpen[platform] ?? factOpen.instagram, facts.join(' ') || `Material de ${name}.`);
+  }
+  sentences.push(preferences.call_to_action === true ? '¿Querés sumar tu experiencia?' : (close[platform] ?? close.instagram));
+  const finalSentences = preferences.brief ? sentences.slice(0, 3) : sentences;
+  return preferences.bullets === true ? finalSentences.map(item => '• ' + item).join('\n') : finalSentences.join(' ');
+}
+
 const templateProvider = {
   name: 'template', model: 'es-platforms-v1',
   async plan({ input }) {
     return {
-      destinations: Object.fromEntries(Object.entries(input.platforms).map(([platform, info]) => [
-        platform, { opening: 0, fragments: input.fragments.slice(0, info.max_fragments).map(x => x.id) },
-      ])),
+      destinations: Object.fromEntries(Object.entries(input.platforms).map(([platform, info]) => {
+        const selected = input.fragments.slice(0, info.max_fragments);
+        return [platform, { copy: templateCopy(input, platform, selected), fragments: selected.map(x => x.id) }];
+      })),
       visual: 'sin determinar',
     };
   },

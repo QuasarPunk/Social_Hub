@@ -153,7 +153,7 @@ La instalación principal usa el Telegram Relay como único receptor y SH-01 com
 | **4. Contexto editorial** | Clasificación dinámica, perfiles configurables y selección manual | Desplegada. Texto y selección validados en producción. Verificación de foto real en producción pendiente |
 | **4.1. Captura multimodal y sesiones de contenido** | Captura agrupada de fotos, texto y audio con transcripción configurable | **Completada.** Validada en el entorno principal |
 | **5. Generación con IA** | Borradores contextualizados por perfil y plataforma | **Completada en desarrollo.** SH-03 validado en Telegram e integrado en `main`; producción sigue en 4.1. [Validación](docs/editorial-drafts.md#validación-real-confirmada) |
-| **5.1. Calidad editorial** | Prompt versionado, perfiles enriquecidos y modelo local recomendado | **Completada en rama.** Recomendación `llama3.2:3b` + prompt 2.1; falta validación real y aprobación antes de producción. [Evaluación](docs/editorial-drafts.md#etapa-51-calidad-editorial) |
+| **5.1. Calidad editorial** | Prompt versionado, perfiles enriquecidos y modelo local recomendado | **Corregida en rama.** Recomendación `llama3.2:3b` + prompt 3.2; validación aislada superada. Falta prueba real y aprobación antes de producción. [Evaluación](docs/editorial-drafts.md#corrección-v3-intención-contrato-y-saneamiento) |
 | **6. Aprobación** | Aprobar, corregir o descartar desde Telegram | Pendiente |
 | **7. Validación** | Pruebas integrales, manejo de errores y documentación | Pendiente |
 
@@ -194,9 +194,9 @@ SH-03 genera borradores en español desde registros `CLASSIFIED`, sus perfiles y
 
 ### Etapa 5.1 — Calidad editorial
 
-El prompt sale del perfil y está versionado. La versión 2.1 pide copias redactadas en español, sin hashtags ni emojis, con diferenciación real entre plataformas y cobertura verificable de los hechos. Los perfiles incorporan notas narrativas derivadas de su identidad, sin codificar marcas en workflows. El motor sanea el texto del modelo, advierte omisiones y cae al ensamble trazable cuando es necesario.
+El prompt sale del perfil y está versionado. La comparación inicial usó la versión 2.1; la corrección v3 usa la versión 3.2. Los perfiles incorporan notas narrativas derivadas de su identidad, sin codificar marcas en workflows. El motor clasifica la intención en `generativo`, `documental` o `mixto`, conserva la copia del modelo, sanea frases genéricas, hashtags, emojis y CTA no pedidas, y registra advertencias en lugar de caer en silencio al ensamble trazable. `/borrador` se bloquea mientras haya una captura abierta.
 
-En tres capturas ficticias y un equipo sin GPU dedicada, `llama3.2:3b` cubrió los tres casos y respetó todas las restricciones; `qwen2.5:3b` fue menos fiable en los hechos y `qwen2.5:1.5b` resultó el más rápido pero perdió información. La recomendación para desarrollo es `llama3.2:3b` con el prompt 2.1. No se promovió a producción ni se inició la Etapa 6. [Mediciones, ejemplos y límites](docs/editorial-drafts.md#etapa-51-calidad-editorial)
+En tres capturas ficticias y un equipo sin GPU dedicada, `llama3.2:3b` cubrió los tres casos y respetó todas las restricciones; `qwen2.5:3b` fue menos fiable en los hechos y `qwen2.5:1.5b` resultó el más rápido pero perdió información. Tras la validación real fallida con prompt 2.1, la corrección v3 pasó 69 pruebas y los tres casos aislados con `llama3.2:3b` + prompt 3.2. La combinación sigue siendo solo de desarrollo: no se promovió a producción ni se inició la Etapa 6. [Mediciones, corrección y límites](docs/editorial-drafts.md#corrección-v3-intención-contrato-y-saneamiento)
 
 ### Evolución futura (fuera del alcance de 0.1)
 
@@ -293,4 +293,10 @@ Se evaluaron tres modelos locales gratuitos con un conjunto fijo de capturas fic
 
 ---
 
-**Estado actual:** SH-01, SH-02 y SH-03 están integrados en `main`; la recepción, el almacenamiento, la clasificación y los borradores editoriales quedaron validados en desarrollo. SH-03 no está desplegado en producción. La Etapa 5.1 está cerrada en `dev/editorial-quality` y su recomendación espera validación real y aprobación humana; la Etapa 6 sigue pendiente.
+### 24 de noviembre de 2026 — Corrección v3 de calidad editorial
+
+La validación real con prompt 2.1 reprodujo la instrucción del usuario como texto final y agregó apertura genérica, pregunta y hashtag. La corrección introdujo modos `generativo`, `documental` y `mixto`, prompt `3.2`, contrato `DRAFT` sin `opening`/`cta`, saneamiento de copias con advertencias y bloqueo de `/borrador` durante capturas activas. Pasaron 69 pruebas y los tres casos ficticios con `llama3.2:3b`, sin acceso a Telegram real. La combinación continúa en desarrollo; no está aprobada para producción. [Detalles](docs/editorial-drafts.md#corrección-v3-intención-contrato-y-saneamiento)
+
+---
+
+**Estado actual:** SH-01, SH-02 y SH-03 están integrados en `main`; la recepción, el almacenamiento, la clasificación y los borradores editoriales quedaron validados en desarrollo. SH-03 no está desplegado en producción. La corrección v3 de la Etapa 5.1 está verificada de forma aislada en `dev/editorial-quality` y espera validación real y aprobación humana; la Etapa 6 sigue pendiente.

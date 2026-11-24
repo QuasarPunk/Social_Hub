@@ -18,6 +18,8 @@ La Etapa 4.1 está desplegada con n8n 2.48.6. El relay es el único receptor de 
 - `dev/editorial-ai` incorpora SH-03, la corrección de la vista previa y la validación real confirmada en `@Test_Social_Hub_bot`. La incidencia de Instagram y Facebook quedó diagnosticada y resuelta. El cierre incluye commit y push de la rama e integración en `main`; SH-03 sigue sin desplegarse en producción. [Incidencia](#incidencia-sh-03-en-telegram)
 - Pasaron 63 pruebas de Node.js, el smoke test aislado de SH-01, SH-02 y SH-03 con n8n 2.48.6 y la generación real con Qwen2.5 1.5B. El registro de la prueba real produjo un lote `DRAFT` con dos plataformas, un intento y cero errores; el proveedor fue Ollama con `qwen2.5:1.5b`, no el respaldo determinista. Los borradores respetaron `sin hashtags; sin emojis`. [Validación real](editorial-drafts.md#validación-real-confirmada)
 - `dev/editorial-quality` completó la Etapa 5.1: prompt 2.1, perfiles versión 3 con notas narrativas, saneamiento de copias y comparación de tres modelos locales con capturas ficticias. `llama3.2:3b` conservó los tres hechos y todas las restricciones, con 160,4 s y 4,944 GiB en CPU. Pasaron 66 pruebas. La recomendación es para desarrollo; no hay despliegue ni aprobación de producción. [Evaluación](editorial-drafts.md#etapa-51-calidad-editorial)
+- La validación real posterior **falló**: `Hace una publicación para QuasarPunk hablando de los botones pulsadores` produjo un borrador que reproducía la instrucción, con apertura genérica, pregunta final y hashtag. El diagnóstico está registrado abajo. No hay autorización para integrar `dev/editorial-quality` en `main`. [Diagnóstico](#diagnóstico-de-calidad-editorial--validación-51-fallida)
+- La corrección v3 quedó implementada y validada con entradas ficticias: modos `generativo`, `documental` y `mixto`, prompt `3.2`, contrato sin `opening`/`cta`, saneamiento de frases genéricas y bloqueo de `/borrador` con captura activa. Pasaron 69 pruebas y los tres casos con `llama3.2:3b`. La aprobación real en `@Test_Social_Hub_bot`, la integración en `main` y el despliegue siguen pendientes. [Corrección](#corrección-de-calidad-v3-y-validación-aislada)
 
 ## Problemas conocidos
 
@@ -77,6 +79,135 @@ Pasaron 44 pruebas de Node.js y la integración de n8n. La relectura de tres not
 
 Para repetir la prueba de voz, usá el bot de desarrollo desde un chat privado autorizado. Enviá `/nuevo`, grabá una nota que mencione QuasarPunk y enviá `/listo`. Confirmá `CLASSIFIED`, `transcript_match`, audio persistido y transcripción presente en un único registro. [Procedimiento de despliegue y reversión](multimodal-capture.md#despliegue-futuro-y-reversión)
 
+## Diagnóstico de calidad editorial — validación 5.1 fallida
+
+**Solicitud.** `Hace una publicación para QuasarPunk hablando de los botones pulsadores`. Se usaron entradas ficticias y el mismo texto para las tres comparaciones. No se descargaron modelos, no se modificó producción, no se integró la rama en `main` y no se inició la Etapa 6.
+
+### Modelo y prompt activos
+
+El lote real de Telegram `mm-2fa82daceb4807bd27ff.json` declara `provider=ollama`, `model=llama3.2:3b`, `prompt_version=2.1` y `attempted=1`. El relay de desarrollo también quedó verificado con `EDITORIAL_MODEL=llama3.2:3b`. Por lo tanto, la recomendación de la Etapa 5.1 sí estaba activa; el fallo no se debe a que se haya usado el modelo o el prompt anteriores.
+
+### Resultados comparativos
+
+**1. Respuesta directa de Ollama**, sin prompt editorial, con la sola instrucción del usuario:
+
+```text
+**¡Descubre el Futuro del Diseño con Botones Pulsadores!**
+
+Hola, comunidad de QuasarPunk!
+
+En este post, vamos a hablar sobre uno de los elementos más influyentes en la creación de interfaces de usuario: los botones pulsadores. ¿Sabías que los botones pulsadores pueden transformar completamente la forma en que interactuamos con una aplicación o dispositivo?
+
+**¿Qué son los botones pulsadores?**
+
+Un botón pulsador es un elemento de interacción que se activa cuando se presiona o se toca durante un período determinado de tiempo. Los botones pulsadores están diseñados para proporcionar una sensación de retroalimentación táctil, lo que hace que el usuario se sienta más conectado con la aplicación o dispositivo.
+
+**Beneficios de los botones pulsadores**
+
+Los botones pulsadores ofrecen varios beneficios para el diseño y la experiencia del usuario:
+
+*   **Mejora la respuesta**: Los botones pulsadores pueden responder rápidamente a las acciones del usuario, lo que reduce la latencia y mejora la experiencia general.
+*   **Incrementa la usabilidad**: La retroalimentación táctil de los botones pulsadores puede ayudar a los usuarios a identificar cómo interactuar con una aplicación o dispositivo.
+*   **Aumenta la fidelidad del usuario**: Los botones pulsadores pueden proporcionar una sensación de satisfacción y logro, lo que puede aumentar la fidelidad del usuario.
+
+**Cómo crear botones pulsadores efectivos**
+
+Para crear botones pulsadores efectivos, sigue estos consejos:
+
+*   **Elige el color adecuado**: Elige un color que se destaque en el diseño y que sea fácil de ver para los usuarios con discapacidades visuales.
+*   **Ajusta la retroalimentación**: Ajusta la retroalimentación táctil según la aplicación o dispositivo para asegurarte de que sea suficiente para identificar la interacción del usuario.
+*   **Prueba y ajusta**: Prueba los botones pulsadores con diferentes usuarios y ajusta según sea necesario.
+
+**Conclusión**
+
+En resumen, los botones pulsadores pueden ser una herramienta poderosa en el diseño y la experiencia del usuario. Al seguir estos consejos y considerar las necesidades de tus usuarios, puedes crear botones pulsadores efectivos que mejoren la respuesta, la usabilidad y la fidelidad del usuario.
+
+¿Cuál es tu opinión sobre los botones pulsadores? ¿Tienes alguna pregunta o comentario? ¡Comparte en el commentario abajo!
+
+¡Gracias por leer este post!
+```
+
+El texto directo es genérico y demasiado extenso, pero desarrolla el tema. Esto descarta que el modelo sea incapaz de hablar de botones pulsadores.
+
+**2. Respuesta original del modelo con el prompt editorial completo de Social Hub**, capturada en el límite del proveedor antes de validación y posprocesamiento:
+
+```json
+{
+  "destinations": {
+    "instagram": {
+      "opening": 1,
+      "fragments": [0],
+      "copy": "Los botones pulsadores: la clave para una experiencia interactiva"
+    },
+    "facebook": {
+      "opening": 2,
+      "fragments": [0],
+      "copy": "¿Qué son los botones pulsadores y cómo pueden mejorar tu proyecto?"
+    }
+  },
+  "visual": "documento"
+}
+```
+
+**3. Resultado final de SH-03** para la misma solicitud, después de validación, saneamiento y respaldo:
+
+```text
+Instagram
+✦ Dinámico, visual y atractivo.
+
+Hace una publicación para QuasarPunk hablando de los botones pulsadores
+
+¿Qué te llama la atención?
+
+#QuasarPunk
+
+Facebook
+Desde QuasarPunk
+
+Hace una publicación para QuasarPunk hablando de los botones pulsadores
+
+¿Qué te gustaría sumar a la conversación?
+
+#QuasarPunk
+```
+
+El lote real recibido en Telegram tuvo el mismo patrón, con la forma original del texto (`HAce una publicacion...`), `warnings=["foto_sin_interpretacion_visual","cobertura_incompleta","copia_modelo_no_usada","copia_null"]` y `errors=[]`.
+
+### Causa identificada
+
+La solicitud fue tratada como **material documental**, no como una instrucción de tema. `contentFragments` solo reconoce como controles las líneas con `Instrucciones:` o `Formato:`; el resto se convierte en hechos. La frase del usuario no tiene ese prefijo, por lo que `services/telegram-relay/editorial-drafts.cjs:83-104` la persistió como fragmento verificable.
+
+La copia del modelo existió, pero fue descartada por la comprobación de cobertura. `coveredByCopy` exige que al menos el 60 % de las palabras del fragmento aparezcan en la copia. La frase de la solicitud aporta `publicacion`, `quasarpunk`, `hablando`, `botones` y `pulsadores`; las copias originales solo contenían `botones` y `pulsadores`, así que no alcanzaron el umbral. En `services/telegram-relay/editorial-drafts.cjs:248-255` se activó `cobertura_incompleta`, `copia_modelo_no_usada` y `copia_null`; este último nombre es engañoso porque la copia del modelo no era nula, sino que se descartó por cobertura.
+
+Descartada la copia, el motor usó el respaldo determinista de `services/telegram-relay/editorial-drafts.cjs:256-270`: apertura del perfil o `Desde <proyecto>`, fragmentos literales, llamada a la acción y hashtag por preferencias. Eso explica exactamente el encabezado genérico, la pregunta final y `#QuasarPunk`. No hubo fallback por error del proveedor ni ausencia de respuesta: hubo un fallback por la regla de cobertura.
+
+No se activó `instruccion_para_revision` porque la frase no empezaba con el prefijo reconocido. La restricción de no inventar acontecimientos se aplicó también al tema solicitado, impidiendo el modo generativo. El prompt `services/telegram-relay/editorial-prompts/v2.json:3` pide trabajar solo con fragmentos y no distingue tema, hecho, explicación general ni modo mixto.
+
+### `/borrador` con captura abierta
+
+`services/telegram-relay/editorial-preview.cjs:24` llama a `editorial.latest(chat_id, user)` sin consultar la sesión activa. `services/telegram-relay/editorial-drafts.cjs:307-312` elige el registro `CLASSIFIED` más reciente por `updated_at` y no filtra por captura abierta. Por eso, si hay una captura abierta sin clasificar, `/borrador` puede devolver el lote de la captura anterior. No es un fallo del modelo ni del prompt.
+
+### Rotación de la clave interna de desarrollo
+
+Se generó una nueva clave criptográfica para `secrets/telegram-dev/relay-key`, se recreó el relay de desarrollo y se reimportó la credencial Header Auth de n8n con el mismo identificador lógico. No se mostró ninguna clave. La verificación desde el contenedor de n8n devolvió `401` para una clave no vigente y `404` para la clave vigente, lo que confirma que el relay rechaza credenciales distintas de la actual y acepta la sincronizada. La clave expuesta literalmente en una sesión anterior no quedó disponible en el repositorio ni en el historiallocal; no se conservó una copia antes de sobrescribir la credencial, por lo que no se pudo repetir la prueba con ese valor exacto sin volver a exponerlo. Si el operador lo conserva, puede entregarlo por canal privado para comprobarlo sin imprimirlo. No se tocó la credencial de producción.
+
+### Corrección recomendada, pendiente de aprobación
+
+1. Clasificar la intención antes de construir fragmentos: `documental` para acontecimientos proporcionados, `generativo` para temas solicitados y `mixto` para ambos. Una frase como `Hace una publicación sobre X` debe producir un `topic`, no un fragmento de hecho.
+2. Enviar `mode` y `topic` al prompt. En modo generativo se permite usar conocimiento general pertinente; la prohibición sigue aplicando a nombres, fechas, lugares, precios, resultados y atribuciones concretas no proporcionadas.
+3. Aplicar `coveredByCopy` solo a fragmentos documentales. Para el tema generativo, reemplazar la coincidencia literal por una comprobación de que la copia desarrolla el tema sin introducir hechos particulares.
+4. No agregar apertura, pregunta final ni hashtag cuando la solicitud pide una publicación lisa, o al menos tratar `sin pregunta final` y `sin hashtags` como controles derivados del lenguaje natural, no solo del prefijo `Instrucciones:`.
+5. Renombrar `copia_null` a `copia_descartada_por_cobertura` o registrar el motivo real para que el traspaso no sugiera un fallo del modelo.
+6. Hacer que `/borrador` vincule la solicitud a la captura activa, o rechazarla con un mensaje explícito mientras haya una captura abierta sin clasificar, en lugar de usar `latest`.
+
+## Corrección de calidad v3 y validación aislada
+
+**Cambios.** `editorial-drafts.cjs` clasifica la intención antes de construir fragmentos y distingue hechos documentales, temas solicitados, instrucciones y restricciones en `generativo`, `documental` y `mixto`. El prompt `editorial-prompts/v3.json` quedó en versión `3.2` y viaja en `generation.prompt_version`. El contrato del proveedor pide `destinations` y `visual`; cada destino exige `copy` y `fragments`, sin `opening` ni `cta`. La fidelidad dejó de usar el umbral rígido del 60 %: ahora solo emite advertencias `fidelity_review` y `fidelity_numbers_review`. `cleanCopy` conserva la copia del modelo, sanea hashtags y emojis, quita repeticiones de la instrucción, frases como «En este post» o «Descubre», CTA no pedidas y artefactos del modelo, y registra avisos como `frases_genericas_omitidas`, `llamada_accion_omitida` o `artefactos_modelo_omitidos`. El proveedor de plantillas dejó de intervenir en silencio: su resultado se marca como `template_fallback`.
+
+**Captura activa.** `capture.cjs` expone `pending(chat,user)` y `editorial-preview.cjs` rechaza `/borrador` con un mensaje explícito mientras exista una sesión `OPEN`, `SEALED` o `FAILED`; ya no reutiliza el lote anterior.
+
+**Comandos y resultados.** `node --test tests/*.test.cjs`: 69 pruebas, 69 correctas. Reconstrucción del relay con `$dev up -d --no-deps --build telegram-relay` y harness aislado con `llama3.2:3b`, Ollama local y datos ficticios. Los tres casos terminaron en `DRAFT` con `provenance=model` y un intento: `val-gen-botones` (`generativo`, 35.956 ms, `warnings=[]`), `val-doc-compostaje` (`documental`, 43.148 ms, `warnings=[]`) y `val-mix-sensor` (`mixto`, 36.593 ms, `warnings=[frases_genericas_omitidas, emojis_modelo_omitidos]`). Las salidas conservaron los hechos y las restricciones; no se imprimieron prompts, credenciales ni respuestas crudas. La variabilidad del modelo puede requerir el segundo intento o saneamiento, y los textos siguen necesitando revisión humana.
+
 ## Próxima misión
 
-Validar en `@Test_Social_Hub_bot` la combinación recomendada `llama3.2:3b` + prompt 2.1 + perfiles 3, con una captura ficticia y `Instrucciones: sin hashtags; sin emojis`. Confirmar texto redactado, hechos conservados, lote `DRAFT` reutilizado, cero publicaciones y registro fuente intacto. Si el resultado y la revisión humana son satisfactorios, decidir la integración de `dev/editorial-quality` en `main`; no desplegar en producción ni iniciar la Etapa 6 sin autorización. El relay de desarrollo ya quedó reconstruido con el modelo recomendado y polling activo para esa prueba breve; después de usar Telegram, recrearlo con `TELEGRAM_POLLING=0`. [Resultados y límites](editorial-drafts.md#etapa-51-calidad-editorial)
+Repetir la validación real en `@Test_Social_Hub_bot` con los tres casos ficticios y `llama3.2:3b` + prompt `3.2`, confirmar el bloqueo de `/borrador` durante una captura abierta y revisar los textos antes de proponer integración. No integrar `dev/editorial-quality` en `main`, no desplegar en producción y no iniciar la Etapa 6 sin autorización nueva. [Diagnóstico](#diagnóstico-de-calidad-editorial--validación-51-fallida)

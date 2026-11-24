@@ -158,6 +158,16 @@ function createCapture(options) {
     });
   }
 
+  function pending(chat, user) {
+    try {
+      const state = readState(actor(chat, user));
+      return Boolean(state.active || Object.values(state.sessions).some(session =>
+        ['OPEN', 'SEALED', 'FAILED'].includes(session.status)));
+    } catch {
+      return false;
+    }
+  }
+
   function markNotice(update) {
     const m = update.message;
     edit(actor(m.chat.id, m.from.id), state => {
@@ -302,7 +312,7 @@ function createCapture(options) {
     }
   }
 
-  return { ingest, markNotice, tick, permitted };
+  return { ingest, markNotice, tick, permitted, pending };
 }
 
 function httpTranscriber(url, fetchAudio = fetch) {
