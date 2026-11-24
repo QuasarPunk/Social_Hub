@@ -1,5 +1,18 @@
 const { setTimeout: delay } = require('node:timers/promises');
 
+const editorialCodes = new Set([
+  'content_not_classified', 'content_not_found', 'editorial_busy', 'invalid_capture_contract',
+  'invalid_content_id', 'invalid_editorial_profile', 'invalid_provider_response', 'no_editorial_facts',
+  'no_supported_platforms', 'provider_quota', 'provider_rejected_input', 'provider_timeout',
+  'provider_unavailable',
+]);
+
+function sanitizedEditorialFailure(error) {
+  const code = editorialCodes.has(error?.code) ? error.code : 'unknown';
+  const reason = typeof error?.reason === 'string' && /^[a-z_]{1,40}$/.test(error.reason) ? error.reason : null;
+  return 'code=' + code + (reason ? ' reason=' + reason : '');
+}
+
 class EditorialError extends Error {
   constructor(code, status = 422, retryable = false) {
     super(code);
@@ -43,7 +56,9 @@ function ollamaProvider({ url, model, timeoutMs = 80000, fetchModel = fetch }) {
       } catch (error) {
         if (error instanceof EditorialError) throw error;
         if (error instanceof SyntaxError || error instanceof TypeError && response) {
-          throw new EditorialError('invalid_provider_response', 502, true);
+          const failure = new EditorialError('invalid_provider_response', 502, true);
+          failure.stage = 'provider_parse';
+          throw failure;
         }
         throw new EditorialError(timeout.aborted ? 'provider_timeout' : 'provider_unavailable', 503, true);
       }
@@ -67,8 +82,8 @@ async function editorialPlan(provider, request, validate, stop, wait = delay) {
   for (let attempt = 1; attempt <= 2; attempt++) {
     const query = attempt === 1 ? request : { ...request, images: [] };
     try {
-      const result = await provider.plan(query, stop);
-      validate(result);
+      const planned = await provider.plan(query, stop);
+      const result = validate(planned) ?? planned;
       return { result, attempted: attempt, imageUsed: query.images.length > 0 };
     } catch (error) {
       if (attempt === 2 || !error.retryable || stop?.aborted) throw error;
@@ -77,4 +92,4 @@ async function editorialPlan(provider, request, validate, stop, wait = delay) {
   }
 }
 
-module.exports = { EditorialError, ollamaProvider, templateProvider, editorialPlan };
+module.exports = { EditorialError, ollamaProvider, templateProvider, editorialPlan, sanitizedEditorialFailure };

@@ -15,28 +15,30 @@ La Etapa 4.1 está desplegada con n8n 2.48.6. El relay es el único receptor de 
 - La rama `dev/multimodal-capture` implementa la Etapa 4.1. La revisión de audios reales confirmó que los nombres deformados por la transcripción no coincidían con el catálogo anterior. La corrección usa alias de voz exactos y contexto de catálogo en el transcriptor. La Etapa 5 sigue pendiente. [Diagnóstico y solución](multimodal-capture.md#clasificación-por-voz)
 - El entorno principal ya ejecuta la Etapa 4.1 con el overlay multimodal y un único receptor. El respaldo local previo al corte se verificó con SHA-256 y una restauración de SQLite. Los 36 archivos históricos conservaron sus bytes. Pasaron 44 pruebas y el smoke test con n8n 2.48.6. [Procedimiento de despliegue y reversión](multimodal-capture.md#despliegue-futuro-y-reversión)
 - La Etapa 4.1 quedó cerrada. El bot principal confirmó una captura real con foto y voz, transcripción local y clasificación en QuasarPunk con `transcript_match`. n8n leyó ambos originales y el registro con los mismos SHA-256. [Validación en producción](multimodal-capture.md#validación-en-producción)
-- `dev/editorial-ai` incorpora SH-03. Las vistas previas reales de Instagram y Facebook fallaron, incluidos los reintentos. La integración en `main` queda pendiente de resolver el defecto y validar Telegram en desarrollo. [Incidencia](#incidencia-sh-03-en-telegram)
-- Pasaron 59 pruebas de Node.js y el smoke test de SH-01, SH-02 y SH-03 con n8n 2.48.6. Qwen2.5 1.5B generó en CPU borradores distintos para Instagram, Facebook y LinkedIn con un perfil ficticio. Para revisar la prueba humana, comprobá que los dos comandos `/borrador` reutilicen el mismo JSON del volumen de borradores y que sigan presentes los originales. [Contrato y verificación](editorial-drafts.md#verificación-y-prueba-humana)
+- `dev/editorial-ai` incorpora SH-03, la corrección de la vista previa y la validación real confirmada en `@Test_Social_Hub_bot`. La incidencia de Instagram y Facebook quedó diagnosticada y resuelta. El cierre incluye commit y push de la rama e integración en `main`; SH-03 sigue sin desplegarse en producción. [Incidencia](#incidencia-sh-03-en-telegram)
+- Pasaron 63 pruebas de Node.js, el smoke test aislado de SH-01, SH-02 y SH-03 con n8n 2.48.6 y la generación real con Qwen2.5 1.5B. El registro de la prueba real produjo un lote `DRAFT` con dos plataformas, un intento y cero errores; el proveedor fue Ollama con `qwen2.5:1.5b`, no el respaldo determinista. Los borradores respetaron `sin hashtags; sin emojis`. [Validación real](editorial-drafts.md#validación-real-confirmada)
 
 ## Problemas conocidos
 
+### Indisponibilidad del entorno de desarrollo tras reiniciar Docker
+
+Al retomar la misión, `docker compose ls` mostraba solo `social_hub` en ejecución. Los cuatro contenedores de `social-hub-telegram-dev` estaban `Exited (255)` con el mismo timestamp; producción tenía `restart: unless-stopped` y había vuelto sola. La causa fue la falta de política de reinicio en el Compose de desarrollo, no una pérdida de volúmenes ni un fallo de modelos.
+
+Se levantaron n8n, Telegram Relay, el transcriptor y Ollama con los perfiles `multimodal` y `editorial-model`, sin `down -v`, sin `pull` de imágenes y sin `ollama pull`. Se conservaron los volúmenes `n8n_dev`, `telegram_records`, `telegram_incoming`, `telegram_sessions`, `whisper_models`, `editorial_models` y `editorial_drafts`. `ollama list` sigue mostrando `qwen2.5:1.5b` y `qwen3-vl:2b`. `/healthz` respondió 200 en 5678 y 5680; el transcriptor respondió 200 en la red interna.
+
+`@Test_Social_Hub_bot` tiene un solo receptor de desarrollo. El relay principal usa `YourSocialHub_bot`, por lo que ambos pueden tener polling activo sin competir por el mismo bot. La secuencia exacta de arranque diario está en [el procedimiento de desarrollo](development-workflow.md#arranque-diario-de-los-entornos).
+
 ### Incidencia SH-03 en Telegram
 
-El bot de desarrollo respondió «No se pudo preparar el borrador. Podés reintentar con /borrador.» a `/borrador instagram` y `/borrador facebook`. El relay, n8n, Ollama y el transcriptor quedaron en ejecución. No se reiniciaron los servicios ni se ejecutaron nuevas inferencias durante el cierre.
+El bot de desarrollo respondía «No se pudo preparar el borrador. Podés reintentar con /borrador.» a `/borrador instagram` y `/borrador facebook`. El registro más reciente del chat estaba en `CLASSIFIED` 1.0, con perfil 2 e Instagram y Facebook habilitados, y no existía un lote para esa captura. Ollama registraba `POST /api/chat` con HTTP 200; eso no probaba que el plan fuera válido.
 
-**Evidencia sanitizada.** El registro de prueba con una foto y dos materiales de texto está en `CLASSIFIED` 1.0, con perfil 2 e Instagram y Facebook habilitados. No existe un lote en `/data/drafts` para ese registro. Ollama registró varias llamadas `POST /api/chat` con HTTP 200 y tiempos de 10 a 20 segundos. El log del relay no registró un código editorial para esos intentos. La respuesta del bot colapsa varios errores en el mismo mensaje. Un rechazo del JSON del proveedor o del plan por el validador es una hipótesis compatible con estos síntomas. HTTP 200 solo confirma la respuesta del proveedor.
+**Diagnóstico.** Se instrumentó `editorial.request` con registro saneado de etapa, código y razón. Una única reproducción con el registro ficticio dio `code=invalid_provider_response reason=fragments_duplicate`, dos intentos y cero lotes escritos. El registro tenía un solo fragmento utilizable y el esquema ofrecía `maxItems: 5` para Facebook. Ollama 0.13.5 respetó `maxItems` pero ignoró `uniqueItems` y devolvió cinco IDs repetidos. El validador local rechazó la selección, el motor reintentó una vez y no persistió nada. `latest` eligió correctamente el registro más reciente; no hubo fallo de parseo, red ni credenciales. No se imprimió contenido ni respuesta cruda del modelo.
 
-**Primer paso para OpenCode.** En `services/telegram-relay/editorial-preview.cjs`, capturá de forma temporal el código de error saneado del bloque que llama a `editorial.request`. Reproducí una sola vez con una captura ficticia. Registrá etapa, código y conteos, sin imprimir el contenido ni la respuesta cruda del modelo. Si resulta `invalid_provider_response`, distinguí el parseo de Ollama en `editorial-provider.cjs` de la validación de destinos, índices y límites en `editorial-drafts.cjs`. Revisá también qué registro eligió `latest` sin registrar su identificador. El workflow `workflows/SH-03-borradores-editoriales.json` llama al mismo motor mediante la ruta interna autenticada. El comando de Telegram lo invoca directamente.
+**Corrección.** El esquema declara `uniqueItems: true` y limita `maxItems` a los IDs disponibles. Si un proveedor repite IDs pese al esquema, el validador conserva el primero de cada uno y agrega `fragmentos_repetidos_omitidos` a `warnings`, sin introducir hechos nuevos. `editorial-preview.cjs` y `/drafts` registran `editorial.request stage=<preview|workflow> code=<código> reason=<razón>` desde listas permitidas. El resto de las violaciones del contrato siguen rechazándose sin persistir un lote. No se cambió el modelo ni se descargaron modelos nuevos. [Detalle técnico](editorial-drafts.md#incidencia-de-la-vista-previa-y-corrección)
 
-```powershell
-git switch dev/editorial-ai
-$dev = @('--env-file','.env.example','-p','social-hub-telegram-dev','-f','compose.telegram-dev.yml','-f','compose.editorial-dev.yml','--profile','editorial-model')
-docker compose @dev ps
-docker compose @dev logs --tail 30 telegram-relay ollama
-node --test tests/editorial-drafts.test.cjs
-```
+**Verificación previa a la prueba humana.** Pasaron 63 pruebas de Node.js, el smoke test aislado de n8n 2.48.6 y una generación real con el registro que fallaba: un intento, `status=DRAFT`, dos plataformas, cero errores, cero advertencias, lote persistido y registro fuente idéntico. El endpoint autenticado de SH-03 en n8n de desarrollo devolvió el mismo lote reutilizado. El smoke test real con tres plataformas cumplió `sin hashtags; sin emojis`.
 
-Para reproducir en Telegram de desarrollo, cerrá una captura ficticia clasificada en un proyecto con Instagram y Facebook y ejecutá `/borrador instagram`. Cuando funcione, comprobá que `/borrador facebook` reutilice el lote y que la captura original se conserve. Con la corrección lista, ejecutá la regresión completa antes de integrar. [Contrato y pruebas](editorial-drafts.md#verificación-y-prueba-humana)
+**Estado actual.** El operador completó la secuencia real en `@Test_Social_Hub_bot` con resultados satisfactorios. La inspección de volúmenes confirmó dos borradores del mismo lote, proveedor Ollama `qwen2.5:1.5b`, un intento, registro fuente conservado, cero errores editoriales y cero publicaciones automáticas. Quedó documentada la advertencia `foto_sin_interpretacion_visual` derivada de `EDITORIAL_VISION=0` en desarrollo. Con estos criterios se cierra SH-03 en `dev/editorial-ai` y se integra en `main`; la Etapa 5.1 continuará en una rama separada. [Evidencia](editorial-drafts.md#validación-real-confirmada)
 
 - Si Telegram acepta un teclado justo antes de un timeout, un reintento puede mostrar otro teclado para el mismo registro. La primera selección válida se conserva.
 - Los registros clasificados antes del contrato 1.0 conservan su formato y no tienen una revisión editorial histórica asignada por el sistema.
@@ -49,7 +51,9 @@ Desde la raíz, en PowerShell con Node.js 22 y Docker disponible:
 
 ```powershell
 node --test tests/*.test.cjs
-docker compose --env-file .env.example -p social-hub-telegram-dev -f compose.telegram-dev.yml config --quiet
+$dev = @('--env-file','.env.example','-p','social-hub-telegram-dev','-f','compose.telegram-dev.yml','-f','compose.editorial-dev.yml','--profile','multimodal','--profile','editorial-model')
+docker compose @dev config --quiet
+docker compose @dev ps
 node scripts/prepare-telegram-dev.cjs --integrated
 ```
 
@@ -71,3 +75,7 @@ Pasaron 44 pruebas de Node.js y la integración de n8n. La relectura de tres not
 | Compatibilidad | Conservar el acceso a los registros históricos y cubrir la recepción de texto y fotografía, los callbacks y el contrato actual con pruebas de regresión. |
 
 Para repetir la prueba de voz, usá el bot de desarrollo desde un chat privado autorizado. Enviá `/nuevo`, grabá una nota que mencione QuasarPunk y enviá `/listo`. Confirmá `CLASSIFIED`, `transcript_match`, audio persistido y transcripción presente en un único registro. [Procedimiento de despliegue y reversión](multimodal-capture.md#despliegue-futuro-y-reversión)
+
+## Próxima misión
+
+Abrir `dev/editorial-quality` desde `main` y ejecutar la Etapa 5.1: medir CPU, RAM y GPU disponibles, comparar como máximo tres modelos locales gratuitos frente a Qwen2.5 1.5B, mejorar prompts y perfiles editoriales sin codificar identidades en workflows ni alterarlas sustancialmente, y ejecutar un conjunto fijo de capturas ficticias de los tres proyectos. El resultado debe recomendar una combinación práctica con ejemplos, tiempos y consumo aproximado. No desplegar SH-03 en producción ni iniciar la Etapa 6. [Plan](editorial-drafts.md#etapa-51-calidad-editorial)

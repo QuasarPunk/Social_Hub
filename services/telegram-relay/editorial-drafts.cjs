@@ -92,7 +92,7 @@ function schemaFor(platforms, ids) {
       type: 'object', additionalProperties: false, required: ['opening', 'fragments'],
       properties: {
         opening: { type: 'integer', enum: [0, 1, 2] },
-        fragments: { type: 'array', minItems: 1, maxItems: config.max_fragments,
+        fragments: { type: 'array', minItems: 1, maxItems: Math.min(config.max_fragments, ids.length), uniqueItems: true,
           items: { type: 'integer', enum: ids } },
       },
     };
@@ -103,19 +103,35 @@ function schemaFor(platforms, ids) {
   };
 }
 
-function validatePlan(plan, platforms, size) {
+function validatePlan(plan, platforms, size, warnings = new Set()) {
   const exact = (object, keys) => !!object && typeof object === 'object' && !Array.isArray(object)
     && Object.keys(object).length === keys.length && keys.every(key => Object.hasOwn(object, key));
-  const fail = () => { throw new EditorialError('invalid_provider_response', 502, true); };
-  if (!exact(plan, ['destinations', 'visual']) || !prompt.visual_categories.includes(plan.visual)
-    || !exact(plan.destinations, Object.keys(platforms))) fail();
+  const fail = reason => {
+    const error = new EditorialError('invalid_provider_response', 502, true);
+    error.stage = 'validate';
+    error.reason = reason;
+    throw error;
+  };
+  if (!exact(plan, ['destinations', 'visual'])) fail('plan_shape');
+  if (!prompt.visual_categories.includes(plan.visual)) fail('visual_category');
+  if (!exact(plan.destinations, Object.keys(platforms))) fail('destination_keys');
   for (const [platform, menu] of Object.entries(platforms)) {
     const picked = plan.destinations[platform];
-    if (!exact(picked, ['opening', 'fragments']) || ![0, 1, 2].includes(picked.opening)
-      || !Array.isArray(picked.fragments) || picked.fragments.length < 1 || picked.fragments.length > menu.max_fragments
-      || new Set(picked.fragments).size !== picked.fragments.length
-      || picked.fragments.some(id => !Number.isSafeInteger(id) || id < 0 || id >= size)) fail();
+    if (!exact(picked, ['opening', 'fragments']) || ![0, 1, 2].includes(picked.opening)) fail('destination_shape');
+    if (!Array.isArray(picked.fragments)) fail('fragments_type');
+    if (picked.fragments.length < 1 || picked.fragments.length > menu.max_fragments) fail('fragments_count');
+    if (picked.fragments.some(id => !Number.isSafeInteger(id) || id < 0 || id >= size)) fail('fragment_id');
+    if (new Set(picked.fragments).size !== picked.fragments.length) {
+      const seen = new Set();
+      picked.fragments = picked.fragments.filter(id => {
+        if (seen.has(id)) return false;
+        seen.add(id);
+        return true;
+      });
+      warnings.add('fragmentos_repetidos_omitidos');
+    }
   }
+  return plan;
 }
 
 function imageInput(media, incoming, warnings) {
@@ -172,7 +188,7 @@ function createEditorialEngine({ records, drafts, incoming, provider, vision = f
     fragments, platforms, preferences };
     const { result, attempted, imageUsed } = await editorialPlan(provider, {
       system: prompt.system, input, schema: schemaFor(platforms, fragments.map(x => x.id)), images,
-    }, plan => validatePlan(plan, platforms, fragments.length), stop, wait);
+    }, plan => validatePlan(plan, platforms, fragments.length, warnings), stop, wait);
     if (images.length && !imageUsed) warnings.add('foto_sin_interpretacion_visual');
     const generatedAt = new Date(now()).toISOString();
     const output = {
@@ -236,4 +252,4 @@ function createEditorialEngine({ records, drafts, incoming, provider, vision = f
   return { request, latest };
 }
 
-module.exports = { createEditorialEngine };
+module.exports = { createEditorialEngine, schemaFor, validatePlan };

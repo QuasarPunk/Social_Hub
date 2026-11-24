@@ -1,3 +1,5 @@
+const { sanitizedEditorialFailure } = require('./editorial-provider.cjs');
+
 const pending = new Set();
 
 function startEditorialPreview(message, { capture, editorial, callTelegram, expectedBot, log }, stop) {
@@ -29,6 +31,7 @@ function startEditorialPreview(message, { capture, editorial, callTelegram, expe
       result = await editorial.request(id, stop);
     } catch (failure) {
       if (stop.aborted) return;
+      log('editorial.request stage=preview ' + sanitizedEditorialFailure(failure));
       const explanations = {
         editorial_busy: 'Hay otro borrador en curso. Volvé a intentar en un momento.',
         no_editorial_facts: 'La captura necesita texto, una descripción o voz transcrita para preparar el borrador.',

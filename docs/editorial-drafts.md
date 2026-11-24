@@ -54,8 +54,39 @@ Publicá SH-03 en n8n de desarrollo. El comando prepara su borrador y conserva S
 
 Para revertir SH-03, despublicá el workflow editorial y recreá el relay de desarrollo con su Compose base, conservando los volúmenes y usando `TELEGRAM_MULTIMODAL=1` si querés seguir probando captura. El servicio Ollama puede detenerse por separado. Un futuro despliegue principal requiere autorización y un overlay propio con volumen de borradores y red privada. La publicación y aprobación quedan para la Etapa 6.
 
+## Incidencia de la vista previa y corrección
+
+La reproducción única con un registro ficticio `CLASSIFIED` y Qwen2.5 1.5B registró `editorial.request stage=repro code=invalid_provider_response reason=fragments_duplicate`, dos intentos y cero lotes escritos. HTTP 200 del proveedor solo confirmó la respuesta; el rechazo ocurrió en el validador local. El registro seleccionado por `latest` era el más reciente del chat y no se modificó.
+
+El registro tenía **un solo fragmento** utilizable, pero el esquema ofrecía `maxItems: 5` para Facebook. Ollama 0.13.5 respetó `maxItems` pero ignoró `uniqueItems` y devolvió cinco IDs repetidos. Como el validador exige selecciones distintas, lanzó `invalid_provider_response`, el motor reintentó una vez y no persistió nada. No había un fallo de parseo, de credenciales ni de red.
+
+La corrección tiene tres partes:
+
+1. El esquema declara `uniqueItems: true` y limita `maxItems` a `Math.min(config.max_fragments, ids.length)`.
+2. Si un proveedor repite IDs pese al esquema, el validador conserva el primer ID de cada uno, agrega `fragmentos_repetidos_omitidos` a `warnings` y sigue rechazando el resto de las violaciones del contrato.
+3. `editorial-preview.cjs` y `/drafts` registran `editorial.request stage=<preview|workflow> code=<código> reason=<razón>` con listas de valores permitidos. No se imprimen prompts, respuestas crudas, IDs de contenido ni materiales.
+
+**Verificación tras la corrección.** Pasaron 63 pruebas de Node.js, el smoke test aislado de n8n 2.48.6 y una generación real con el mismo registro ficticio: `attempted=1`, `status=DRAFT`, dos plataformas, cero errores, cero advertencias, lote persistido y registro fuente idéntico. El endpoint autenticado de SH-03 en n8n de desarrollo devolvió el mismo lote reutilizado (`provider=ollama`, `attempted=1`). El smoke test con proveedor real y textos ficticios respetó `sin hashtags; sin emojis` en Instagram, Facebook y LinkedIn. La validación final con `@Test_Social_Hub_bot` queda para el operador; no se publicó nada en producción.
+
+**Limitación conocida.** La generación estructurada de Ollama 0.13.5 no garantiza `uniqueItems`. El límite de `maxItems` y la normalización defensiva evitan borradores duplicados sin introducir hechos nuevos. Si aparecen otras violaciones, se registran con su código y razón saneados y el lote no se persiste. No se cambió el modelo ni se descargaron modelos adicionales.
+
+## Validación real confirmada
+
+El operador confirmó la recepción correcta de los borradores de Instagram y Facebook en `@Test_Social_Hub_bot`, sin hashtags ni emojis. La inspección de los volúmenes de desarrollo identificó el lote generado después de la última captura: dos borradores en un único archivo `DRAFT`, con `draft_id` derivados del mismo `content_id`, plataformas `instagram` y `facebook`, un solo `generated_at` y un solo `generation.attempted=1`. El registro fuente sigue en `CLASSIFIED` 1.0 del perfil QuasarPunk 2, con `updated_at` anterior a la generación; el motor solo leyó el registro y escribió el archivo de borradores.
+
+El lote declara `generation.provider=ollama`, `generation.model=qwen2.5:1.5b` y `prompt_version=1.0`. No intervino el proveedor determinista de plantillas. Ambos textos conservan el hecho del taller y la placa Arduino; ninguno contiene `#` ni emojis. Quedó registrada la advertencia saneada `foto_sin_interpretacion_visual` porque el despliegue de desarrollo tiene `EDITORIAL_VISION=0`: la foto se preservó como medio pero no se envió al modelo. Ese es un dato de calidad para la Etapa 5.1, no un error de SH-03.
+
+No aparecieron líneas `editorial.request` con error en el relay de desarrollo desde el reinicio. Tampoco aparecieron eventos de publicación en los registros de n8n de desarrollo ni en los contenedores de producción. El volumen conserva un lote anterior de prueba con hashtag y emoji; pertenece a una captura distinta y no forma parte de esta validación final.
+
 ## Verificación y prueba humana
 
 Ejecutá `node --test tests/*.test.cjs` y el smoke test aislado de n8n. `tests/editorial-model-smoke.cjs` verifica el proveedor real con un directorio efímero, una foto ficticia opcional y un perfil de prueba que habilita las tres plataformas. Usá la imagen del relay con el test montado en `/test/editorial-model-smoke.cjs`, el catálogo en `/projects` y la red `social-hub-telegram-dev_telegram_internal`. [Integración aislada](editorial-classification.md#verificación-aislada)
 
-Enviá `/nuevo` al bot de desarrollo y agregá una foto de prueba. Escribí `QuasarPunk: En un taller de prueba usamos una placa Arduino.` y, en otra línea, `Instrucciones: sin hashtags; sin emojis`. Enviá `/listo`, esperá la clasificación y pedí `/borrador instagram`. Después pedí `/borrador facebook` para comprobar que la captura reutiliza el mismo lote.
+Secuencia única de validación real en `@Test_Social_Hub_bot`:
+
+1. Enviá `/nuevo`, una foto ficticia y este texto en dos líneas: `QuasarPunk: En un taller de prueba usamos una placa Arduino.` y `Instrucciones: sin hashtags; sin emojis`.
+2. Enviá `/listo` y esperá la confirmación `CLASSIFIED`.
+3. Enviá `/borrador instagram`. Debe llegar un borrador con la placa Arduino, sin `#` ni emojis.
+4. Enviá `/borrador facebook`. Debe llegar otro texto del mismo lote y con las mismas restricciones.
+
+Criterios de aceptación: los dos borradores tienen plataformas distintas, el lote se reutiliza con un solo `generation.attempted`, el registro original y la foto siguen presentes y sin cambios, no hay mensajes de publicación automática y el log del relay solo registra `editorial.request` si hay un error. Ante un fallo, informá el `code` y la `reason` saneados; no reenvíes la captura hasta analizarlos.

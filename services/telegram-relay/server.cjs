@@ -1,6 +1,7 @@
 const { createHash, timingSafeEqual } = require('node:crypto');
 const { readFileSync } = require('node:fs');
 const { createServer } = require('node:http');
+const { EditorialError, sanitizedEditorialFailure } = require('./editorial-provider.cjs');
 
 const MAX_BODY = 64 * 1024;
 const MAX_CHAT_ID = 2 ** 52 - 1;
@@ -64,7 +65,7 @@ function requestTelegram(fetchTelegram, botToken, method, payload, signal) {
   });
 }
 
-function createRelay({ botToken, relayKey, allowedChats, fetchTelegram = fetch, timeoutMs = 5000, intake, generateDraft }) {
+function createRelay({ botToken, relayKey, allowedChats, fetchTelegram = fetch, timeoutMs = 5000, intake, generateDraft, log = () => {} }) {
   if (!/^[0-9]+:[A-Za-z0-9_-]+$/.test(botToken ?? '')
     || !/^[a-f0-9]{64}$/.test(relayKey ?? '') || !allowedChats?.length
     || allowedChats.some(value => chatId(value) === null)) {
@@ -117,8 +118,10 @@ function createRelay({ botToken, relayKey, allowedChats, fetchTelegram = fetch, 
         response.end(JSON.stringify(draft));
       } catch (failure) {
         if (!stop.signal.aborted) {
-          const { EditorialError } = require('./editorial-provider.cjs');
-          if (failure instanceof EditorialError) return error(response, failure.status, failure.code);
+          if (failure instanceof EditorialError) {
+            log('editorial.request stage=workflow ' + sanitizedEditorialFailure(failure));
+            return error(response, failure.status, failure.code);
+          }
           throw failure;
         }
       }
@@ -253,7 +256,7 @@ if (require.main === module) {
         vision: kind === 'ollama' && process.env.EDITORIAL_VISION === '1',
       });
     }
-    const server = createRelay({ botToken, relayKey, allowedChats, intake, generateDraft: options.editorial?.request });
+    const server = createRelay({ botToken, relayKey, allowedChats, intake, generateDraft: options.editorial?.request, log: console.log });
     if (seed) {
       if (options.allowedChats.size !== 1) throw new Error('expected_single_chat');
       seedRecord(options.records, options.projects, options.allowedChats.values().next().value);

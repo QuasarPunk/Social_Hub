@@ -4,8 +4,8 @@ const { tmpdir } = require('node:os');
 const { join } = require('node:path');
 const { once } = require('node:events');
 const { test } = require('node:test');
-const { createEditorialEngine } = require('../services/telegram-relay/editorial-drafts.cjs');
-const { ollamaProvider, templateProvider } = require('../services/telegram-relay/editorial-provider.cjs');
+const { createEditorialEngine, schemaFor } = require('../services/telegram-relay/editorial-drafts.cjs');
+const { EditorialError, ollamaProvider, templateProvider } = require('../services/telegram-relay/editorial-provider.cjs');
 const { createRelay } = require('../services/telegram-relay/server.cjs');
 const { startEditorialPreview } = require('../services/telegram-relay/editorial-preview.cjs');
 
@@ -134,6 +134,72 @@ test('rechaza estructura inválida, reintenta una vez y deja los borradores sin 
   await assert.rejects(f.engine.request('fake-content'), { code: 'invalid_provider_response' });
   assert.equal(attempts, 2);
   assert.deepEqual(fs.readdirSync(f.drafts), []);
+});
+
+test('el esquema limita fragmentos a los IDs disponibles y exige unicidad', () => {
+  const schema = schemaFor({ instagram: { max_fragments: 3 }, facebook: { max_fragments: 5 } }, [0, 1]);
+  for (const platform of ['instagram', 'facebook']) {
+    const fragments = schema.properties.destinations.properties[platform].properties.fragments;
+    assert.equal(fragments.uniqueItems, true);
+    assert.equal(fragments.maxItems, 2);
+    assert.deepEqual(fragments.items.enum, [0, 1]);
+  }
+});
+
+test('Ollama recibe el esquema con uniqueItems y el máximo disponible', async () => {
+  let body;
+  const provider = ollamaProvider({ url: 'http://fixture.invalid', model: 'mock', async fetchModel(_url, options) {
+    body = JSON.parse(options.body);
+    return { ok: true, json: async () => ({ message: { content: '{}' } }) };
+  } });
+  await provider.plan({ system: 's', input: {}, schema: schemaFor({ instagram: { max_fragments: 5 } }, [0]), images: [] });
+  const fragments = body.format.properties.destinations.properties.instagram.properties.fragments;
+  assert.equal(fragments.uniqueItems, true);
+  assert.equal(fragments.maxItems, 1);
+});
+
+test('normaliza IDs repetidos sin reintentar ni duplicar citas', async t => {
+  let attempts = 0;
+  const duplicated = {
+    destinations: {
+      instagram: { opening: 0, fragments: [0, 0] },
+      facebook: { opening: 1, fragments: [0] },
+    },
+    visual: 'sin determinar',
+  };
+  const f = fixture(t, simulated(() => { attempts++; return duplicated; }));
+  f.input();
+  const result = await f.engine.request('fake-content');
+  assert.equal(attempts, 1);
+  assert.equal(result.generation.attempted, 1);
+  assert.ok(result.warnings.includes('fragmentos_repetidos_omitidos'));
+  assert.equal(result.drafts[0].text.split('Biblioteca Norte').length - 1, 1);
+  assert.equal(result.drafts[0].text.split('Se trabajó').length - 1, 0);
+  assert.equal(fs.readdirSync(f.drafts).length, 1);
+});
+
+test('la vista previa registra código y razón saneados sin contenido del proveedor', async t => {
+  const f = fixture(t, { name: 'fixture', model: 'x', async plan() {
+    const failure = new EditorialError('invalid_provider_response', 502, true);
+    failure.reason = 'fragments_duplicate';
+    failure.message = 'SECRETO_DEL_PROVEEDOR_NO_DEBE_SALIR';
+    throw failure;
+  } });
+  const { record } = f.input();
+  const logged = Promise.withResolvers();
+  const sent = Promise.withResolvers();
+  const options = {
+    capture: { permitted: () => true },
+    editorial: f.engine,
+    log: line => logged.resolve(line),
+    async callTelegram(_method, payload) { sent.resolve(payload.text); },
+  };
+  startEditorialPreview({ chat: { id: record.chat_id }, from: { id: record.user_id }, text: '/borrador instagram' },
+    options, new AbortController().signal);
+  const [line, text] = await Promise.all([logged.promise, sent.promise]);
+  assert.equal(line, 'editorial.request stage=preview code=invalid_provider_response reason=fragments_duplicate');
+  assert.ok(!line.includes('SECRETO_DEL_PROVEEDOR_NO_DEBE_SALIR'));
+  assert.match(text, /No se pudo preparar el borrador/);
 });
 
 for (const [type, expected, attempts] of [['quota', 'provider_quota', 1], ['network', 'provider_unavailable', 2]]) {
