@@ -2,7 +2,7 @@
 
 **Sistema inteligente y autohospedado de gestión de contenidos para redes sociales**
 
-> **Estado:** En desarrollo · **Versión objetivo:** 0.1 (prototipo) · Etapa 4 desplegada en el entorno principal · Etapa 4.1 planificada
+> **Estado:** En desarrollo · **Versión objetivo:** 0.1 (prototipo) · Etapa 4 completada en el entorno principal · Etapa 4.1 implementada en desarrollo
 
 ## ¿Qué es Social Hub?
 
@@ -151,7 +151,7 @@ La instalación principal usa el Telegram Relay como único receptor y SH-01 com
 | **2. Telegram** | Bot, webhook HTTPS, filtro por chat y respuesta | **Completada** (exportación del workflow pendiente como tarea documental) |
 | **3. Recepción y almacenamiento** | Recepción, almacenamiento y confirmación | **Completada funcionalmente** |
 | **4. Contexto editorial** | Clasificación dinámica, perfiles configurables y selección manual | Desplegada. Texto y selección validados en producción. Verificación de foto real en producción pendiente |
-| **4.1. Captura multimodal y sesiones de contenido** | Captura agrupada de fotos, texto y audio con transcripción configurable | Planificada |
+| **4.1. Captura multimodal y sesiones de contenido** | Captura agrupada de fotos, texto y audio con transcripción configurable | Implementada en desarrollo. Validación real pendiente |
 | **5. Generación con IA** | Borradores contextualizados a partir de texto e imagen | Pendiente |
 | **6. Aprobación** | Aprobar, corregir o descartar desde Telegram | Pendiente |
 | **7. Validación** | Pruebas integrales, manejo de errores y documentación | Pendiente |
@@ -179,11 +179,11 @@ En el bot principal se verificaron la clasificación automática por identificad
 
 ### Etapa 4.1 — Captura multimodal y sesiones de contenido
 
-La siguiente misión, previa a la Etapa 5, agrupará fotografías, textos, notas de voz y archivos de audio consecutivos en una sesión persistente por usuario y chat. La captura automática cerrará tras **90 segundos de inactividad** por defecto, con una ventana y una duración máxima configurables. Cada material nuevo reiniciará el contador de inactividad sin extender la duración máxima de la sesión.
+El modo multimodal agrupa fotografías, textos, notas de voz y archivos de audio consecutivos en una sesión persistente por usuario y chat. La captura automática cierra tras **90 segundos de inactividad** por defecto y tiene un máximo de **10 minutos**. Ambos valores son configurables. Cada material nuevo reinicia el contador de inactividad y mantiene el vencimiento máximo.
 
-Los comandos `/nuevo`, `/listo` y `/cancelar` abrirán, finalizarán y cancelarán una captura, respectivamente. Una sesión explícita iniciada con `/nuevo` debe admitir notas de voz largas sin cerrarse prematuramente por las reglas de captura automática.
+Los comandos `/nuevo`, `/listo` y `/cancelar` abren, finalizan y cancelan una captura, respectivamente. Una sesión explícita puede esperar la llegada de notas de voz largas.
 
-La transcripción usará un proveedor configurable, con prioridad para opciones gratuitas y locales. La clasificación editorial de los materiales agrupados empezará cuando la captura esté cerrada y todas las transcripciones necesarias estén disponibles. Las sesiones deberán recuperarse tras reinicios, evitar el procesamiento duplicado y conservar la compatibilidad con los registros históricos y el circuito existente. [Próxima misión y criterios de prueba](docs/HANDOFF.md#próxima-misión-de-la-etapa-41)
+La transcripción en desarrollo usa faster-whisper local y un proveedor HTTP configurable. La clasificación editorial comienza al cerrar la captura y obtener las transcripciones necesarias. El contrato de captura agrega los medios agrupados y conserva el contexto editorial de `CLASSIFIED` 1.0. [Arquitectura, contrato y despliegue](docs/multimodal-capture.md)
 
 ### Evolución futura (fuera del alcance de 0.1)
 

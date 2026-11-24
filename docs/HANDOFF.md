@@ -12,13 +12,14 @@ La Etapa 4 está desplegada con n8n 2.48.6. El relay es el único receptor de Te
 
 - Pasaron la matriz de ocho criterios, la suite de regresión y la integración aislada. El bot de desarrollo comprobó texto, foto, clasificación por identificador y alias, teclados ambiguos e idempotencia.
 - En el bot principal se verificaron la clasificación automática, la selección manual y la persistencia de una fotografía que n8n pudo leer. Los 25 registros y 5 archivos históricos conservaron sus bytes. La Etapa 4 quedó cerrada.
-- La siguiente misión es implementar la Etapa 4.1 en desarrollo. La Etapa 5 sigue pendiente.
+- La rama `dev/multimodal-capture` implementa la Etapa 4.1 mediante un modo opt-in del relay y un transcriptor local. La próxima misión es verificar el circuito con el bot de pruebas y revisar los resultados antes de integrar la rama o desplegar la 4.1. La Etapa 5 sigue pendiente.
 
 ## Problemas conocidos
 
 - Si Telegram acepta un teclado justo antes de un timeout, un reintento puede mostrar otro teclado para el mismo registro. La primera selección válida se conserva.
 - Los registros clasificados antes del contrato 1.0 conservan su formato y no tienen una revisión editorial histórica asignada por el sistema.
 - Las exportaciones antiguas del historial incluyen metadatos privados. El árbol de trabajo usa copias saneadas. Consultá el informe técnico y mantené fuera de Git los secretos, datos reales y exportaciones crudas. [Revisión del historial](editorial-classification.md#revisión-del-historial)
+- El endpoint de descarga de Telegram limita el archivo a 20 MiB. Una transcripción fallida conserva el audio y puede reintentarse con `/listo`. El worker procesa una captura sellada a la vez. Los diarios acumulan metadatos de deduplicación. [Diseño y operación](multimodal-capture.md)
 
 ## Verificación
 
@@ -32,9 +33,9 @@ node scripts/prepare-telegram-dev.cjs --integrated
 
 El último comando prepara los borradores y la credencial interna de una instancia de desarrollo ya configurada. Usalo con los secretos de desarrollo y antes de publicar los workflows. Para probar sin credenciales ni red externa, ejecutá el smoke test de n8n con Telegram simulado. [Comando reproducible de integración](editorial-classification.md#verificación-aislada)
 
-## Próxima misión de la Etapa 4.1
+## Validación real de la Etapa 4.1
 
-Implementar captura multimodal y sesiones sin cambiar el consumidor único de Telegram ni empezar la generación editorial. Revisar primero `services/telegram-relay/callbacks.cjs` para el despacho, `intake.cjs` para la persistencia y `editorial.cjs` para la clasificación. Reusar el catálogo versionado y evaluar los cambios necesarios en SH-01 y SH-02 con la integración aislada.
+El despacho está en `services/telegram-relay/callbacks.cjs`, la sesión y el worker en `capture.cjs` y la clasificación común en `editorial.cjs`. SH-01 y SH-02 de n8n 2.48.6 mantuvieron sus JSON y versiones de nodos. La suite cubre los criterios de la tabla y el smoke test comprueba una captura de foto y voz a través de ambos workflows. [Preparación y reversión](multimodal-capture.md#instalación-y-prueba-en-desarrollo)
 
 | Área | Criterio de aceptación |
 | --- | --- |
@@ -45,4 +46,4 @@ Implementar captura multimodal y sesiones sin cambiar el consumidor único de Te
 | Transcripción y clasificación | Usar un proveedor configurable y evaluar primero alternativas locales y gratuitas. Probar transcripciones pendientes y reintentos. Clasificar el conjunto solo después de finalizar la captura y obtener las transcripciones necesarias. |
 | Compatibilidad | Conservar el acceso a los registros históricos y cubrir la recepción de texto y fotografía, los callbacks y el contrato actual con pruebas de regresión. |
 
-Usá un reloj controlado para las pruebas de inactividad y proveedores simulados para probar reintentos sin servicios pagos. Documentá la calidad, los requisitos locales y las alternativas antes de elegir el proveedor. Como parte del cierre, actualizá este traspaso, README.md, la documentación técnica y las pruebas para que cualquier agente pueda continuar.
+Para la validación humana, usá el bot de desarrollo desde un chat privado autorizado. Enviá un texto con prefijo de QuasarPunk y esperá el cierre automático. Luego usá `/nuevo`, enviá un álbum sin prefijo, grabá una nota neutral en español y enviá `/listo`. Elegí un proyecto en el teclado. Abrí otra sesión, enviá un texto y cancelala. Inspeccioná el registro, los medios, la transcripción, la respuesta a la pulsación y el estado cancelado sin publicar datos de la prueba.
