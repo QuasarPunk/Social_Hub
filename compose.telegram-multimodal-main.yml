@@ -10,6 +10,7 @@ services:
       - telegram_sessions:/data/sessions
 
   transcriber:
+    restart: unless-stopped
     extends:
       file: compose.telegram-dev.yml
       service: transcriber

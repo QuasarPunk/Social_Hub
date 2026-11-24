@@ -13,6 +13,8 @@ La Etapa 4 está desplegada con n8n 2.48.6. El relay es el único receptor de Te
 - Pasaron la matriz de ocho criterios, la suite de regresión y la integración aislada. El bot de desarrollo comprobó texto, foto, clasificación por identificador y alias, teclados ambiguos e idempotencia.
 - En el bot principal se verificaron la clasificación automática, la selección manual y la persistencia de una fotografía que n8n pudo leer. Los 25 registros y 5 archivos históricos conservaron sus bytes. La Etapa 4 quedó cerrada.
 - La rama `dev/multimodal-capture` implementa la Etapa 4.1. La revisión de audios reales confirmó que los nombres deformados por la transcripción no coincidían con el catálogo anterior. La corrección usa alias de voz exactos y contexto de catálogo en el transcriptor. La Etapa 5 sigue pendiente. [Diagnóstico y solución](multimodal-capture.md#clasificación-por-voz)
+- El entorno principal ya ejecuta la Etapa 4.1 con el overlay multimodal y un único receptor. El respaldo local previo al corte se verificó con SHA-256 y una restauración de SQLite. Los 36 archivos históricos conservaron sus bytes. Pasaron 44 pruebas y el smoke test con n8n 2.48.6. [Procedimiento de despliegue y reversión](multimodal-capture.md#despliegue-futuro-y-reversión)
+- Falta comprobar una captura real en el bot principal. Debe reunir una foto sin descripción y una nota de voz que mencione QuasarPunk en una sesión iniciada con `/nuevo` y cerrada con `/listo`. Confirmar ambos originales, la transcripción, `CLASSIFIED` 1.0 con `transcript_match` y la respuesta de Telegram. Después, registrar el cierre en `main` e iniciar `dev/editorial-ai`.
 
 ## Problemas conocidos
 
