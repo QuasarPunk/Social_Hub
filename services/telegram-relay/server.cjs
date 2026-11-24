@@ -1,6 +1,7 @@
 const { createHash, timingSafeEqual } = require('node:crypto');
 const { readFileSync } = require('node:fs');
 const { createServer } = require('node:http');
+const { EditorialError, sanitizedEditorialFailure } = require('./editorial-provider.cjs');
 
 const MAX_BODY = 64 * 1024;
 const MAX_CHAT_ID = 2 ** 52 - 1;
@@ -64,7 +65,7 @@ function requestTelegram(fetchTelegram, botToken, method, payload, signal) {
   });
 }
 
-function createRelay({ botToken, relayKey, allowedChats, fetchTelegram = fetch, timeoutMs = 5000, intake }) {
+function createRelay({ botToken, relayKey, allowedChats, fetchTelegram = fetch, timeoutMs = 5000, intake, generateDraft, log = () => {} }) {
   if (!/^[0-9]+:[A-Za-z0-9_-]+$/.test(botToken ?? '')
     || !/^[a-f0-9]{64}$/.test(relayKey ?? '') || !allowedChats?.length
     || allowedChats.some(value => chatId(value) === null)) {
@@ -79,7 +80,8 @@ function createRelay({ botToken, relayKey, allowedChats, fetchTelegram = fetch, 
       return error(response, 401, 'unauthorized');
     }
     const isIntake = request.url === '/classify' && intake;
-    if (request.url !== '/sendMessage' && !isIntake) return error(response, 404, 'not_found');
+    const isDraft = request.url === '/drafts' && generateDraft;
+    if (request.url !== '/sendMessage' && !isIntake && !isDraft) return error(response, 404, 'not_found');
     if (request.method !== 'POST') {
       response.setHeader('allow', 'POST');
       return error(response, 405, 'method_not_allowed');
@@ -105,6 +107,25 @@ function createRelay({ botToken, relayKey, allowedChats, fetchTelegram = fetch, 
       payload = JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(Buffer.concat(chunks)));
     } catch {
       return error(response, 400, 'invalid_json');
+    }
+    if (isDraft) {
+      if (!hasFields(payload, ['content_id'])) return error(response, 400, 'invalid_content_id');
+      const stop = new AbortController();
+      response.once('close', () => { if (!response.writableFinished) stop.abort(); });
+      try {
+        const draft = await generateDraft(payload.content_id, stop.signal);
+        response.writeHead(200, JSON_HEADERS);
+        response.end(JSON.stringify(draft));
+      } catch (failure) {
+        if (!stop.signal.aborted) {
+          if (failure instanceof EditorialError) {
+            log('editorial.request stage=workflow ' + sanitizedEditorialFailure(failure));
+            return error(response, failure.status, failure.code);
+          }
+          throw failure;
+        }
+      }
+      return;
     }
     if (isIntake) {
       const record = await intake(payload);
@@ -221,7 +242,21 @@ if (require.main === module) {
       });
     }
     const intake = workflowUrl && (options.capture?.ingest ?? createIntake({ ...options, fetchPhoto: fetchMedia }));
-    const server = createRelay({ botToken, relayKey, allowedChats, intake });
+    if (process.env.EDITORIAL_ENABLED === '1') {
+      const { createEditorialEngine } = require('./editorial-drafts.cjs');
+      const { ollamaProvider, templateProvider } = require('./editorial-provider.cjs');
+      const kind = process.env.EDITORIAL_PROVIDER ?? 'ollama';
+      if (!['ollama', 'template'].includes(kind)) throw new Error('invalid_editorial_provider');
+      options.editorial = createEditorialEngine({
+        records: options.records, incoming: options.incoming, drafts: '/data/drafts',
+        provider: kind === 'template' ? templateProvider : ollamaProvider({
+          url: process.env.EDITORIAL_OLLAMA_URL ?? 'http://ollama:11434',
+          model: process.env.EDITORIAL_MODEL ?? 'qwen2.5:1.5b',
+        }),
+        vision: kind === 'ollama' && process.env.EDITORIAL_VISION === '1',
+      });
+    }
+    const server = createRelay({ botToken, relayKey, allowedChats, intake, generateDraft: options.editorial?.request, log: console.log });
     if (seed) {
       if (options.allowedChats.size !== 1) throw new Error('expected_single_chat');
       seedRecord(options.records, options.projects, options.allowedChats.values().next().value);

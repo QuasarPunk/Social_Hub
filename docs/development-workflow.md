@@ -9,6 +9,47 @@ El recorrido integrado de SH-01 y SH-02 se verifica con el [procedimiento aislad
 3. Ejecutá `node --test tests/*.test.cjs` con Node.js 22. Revisá el diff y verificá la importación en una instancia aislada.
 4. Incluí en la revisión de Git la versión, los resultados y los pendientes. La promoción a producción se decide por separado.
 
+## Arranque diario de los entornos
+
+Después de reiniciar Docker Desktop, comprobá primero `docker compose ls`. El entorno principal tiene `restart: unless-stopped` y vuelve solo; el entorno de desarrollo no tiene esa política y queda detenido con código 255 hasta que se levanta explícitamente. No uses `docker compose down -v`: elimina los volúmenes.
+
+**Entorno principal** (n8n en `127.0.0.1:5678`, bot `YourSocialHub_bot`):
+
+```powershell
+$main = @('--env-file','.env','-p','social_hub','-f','docker-compose.yml','-f','compose.telegram-main.yml','-f','compose.telegram-multimodal-main.yml','--profile','multimodal')
+docker compose @main config --quiet
+docker compose @main up -d
+docker compose @main ps
+(Invoke-WebRequest -Uri 'http://127.0.0.1:5678/healthz' -UseBasicParsing).StatusCode
+```
+
+**Entorno de desarrollo** (n8n en `127.0.0.1:5680`, bot de pruebas `Test_Social_Hub_bot`):
+
+```powershell
+$dev = @('--env-file','.env.example','-p','social-hub-telegram-dev','-f','compose.telegram-dev.yml','-f','compose.editorial-dev.yml','--profile','multimodal','--profile','editorial-model')
+$env:TELEGRAM_MULTIMODAL = '1'
+$env:TELEGRAM_POLLING = '0'
+docker compose @dev config --quiet
+docker compose @dev up -d --no-deps n8n ollama transcriber telegram-relay
+docker compose @dev ps
+docker compose @dev exec -T ollama ollama list
+docker compose @dev exec -T telegram-relay node -e "fetch('http://transcriber:8090/health').then(r => console.log('transcriber', r.status))"
+Start-Sleep -Seconds 15
+(Invoke-WebRequest -Uri 'http://127.0.0.1:5680/healthz' -UseBasicParsing).StatusCode
+```
+
+Usá `TELEGRAM_POLLING=1` solo durante una prueba real autorizada y recreá el relay con `0` al terminar. Los modelos y los registros viven en volúmenes con nombre; el comando anterior no descarga modelos ni modifica los originales. Para iniciar solo la infraestructura sin Ollama, quitá `--profile editorial-model` y el servicio `ollama` de la lista.
+
+Para confirmar que cada bot tiene un único receptor, compará solo el nombre esperado, sin imprimir secretos:
+
+```powershell
+docker inspect social-hub-telegram-dev-telegram-relay-1 --format '{{range .Config.Env}}{{println .}}{{end}}' | Select-String '^TELEGRAM_EXPECTED_BOT='
+docker inspect social_hub-telegram-relay-1 --format '{{range .Config.Env}}{{println .}}{{end}}' | Select-String '^TELEGRAM_EXPECTED_BOT='
+docker compose @dev logs --tail 8 telegram-relay
+```
+
+Los nombres deben ser distintos. El receptor de desarrollo anuncia `Recepción de mensajes y callbacks activa` únicamente cuando `TELEGRAM_POLLING=1`; con `0` solo atiende la API interna.
+
 ## Importar y comprobar el teclado
 
 La [copia de SH-01](../workflows/SH-01-telegram-teclado-prueba.json) incluye una rama manual que simula la respuesta de SH-02 y evita las operaciones de archivos. El Telegram Trigger está deshabilitado y el vínculo con SH-02 queda sin asignar. La expresión completa de `inlineKeyboard` viene en el JSON.

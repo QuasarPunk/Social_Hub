@@ -12,4 +12,12 @@ function integratedDrafts({ credential, entryId, classificationId, relayUrl }) {
   return [classification, entry];
 }
 
-module.exports = { integratedDrafts };
+function editorialDraft({ credential, entryId, relayUrl }) {
+  const workflow = structuredClone(require('../workflows/SH-03-borradores-editoriales.json'));
+  workflow.id = entryId;
+  for (const node of workflow.nodes) node.credentials = { httpHeaderAuth: credential };
+  if (relayUrl) workflow.nodes.find(node => node.type === 'n8n-nodes-base.httpRequest').parameters.url = relayUrl + '/drafts';
+  return workflow;
+}
+
+module.exports = { integratedDrafts, editorialDraft };

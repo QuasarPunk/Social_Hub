@@ -97,7 +97,7 @@ Las exportaciones históricas versionadas son copias saneadas. Conservá los ori
 
 ## Ejecución local
 
-Para preparar el circuito integrado o reproducir su prueba aislada, seguí la [verificación de la Etapa 4](docs/editorial-classification.md#verificación-aislada). La [guía del relay](docs/telegram-relay.md) también conserva el procedimiento de la primera prueba de teclados.
+Tras reiniciar Docker Desktop, seguí el [arranque diario de ambos entornos](docs/development-workflow.md#arranque-diario-de-los-entornos). Para preparar el circuito integrado o reproducir su prueba aislada, seguí la [verificación de la Etapa 4](docs/editorial-classification.md#verificación-aislada). La [guía del relay](docs/telegram-relay.md) también conserva el procedimiento de la primera prueba de teclados.
 
 **Requisitos:** Docker Desktop con Docker Compose funcionando. El entorno inicial se desarrolló sobre Windows 11 x64 con WSL 2.
 
@@ -152,7 +152,7 @@ La instalación principal usa el Telegram Relay como único receptor y SH-01 com
 | **3. Recepción y almacenamiento** | Recepción, almacenamiento y confirmación | **Completada funcionalmente** |
 | **4. Contexto editorial** | Clasificación dinámica, perfiles configurables y selección manual | Desplegada. Texto y selección validados en producción. Verificación de foto real en producción pendiente |
 | **4.1. Captura multimodal y sesiones de contenido** | Captura agrupada de fotos, texto y audio con transcripción configurable | **Completada.** Validada en el entorno principal |
-| **5. Generación con IA** | Borradores contextualizados a partir de texto e imagen | Pendiente |
+| **5. Generación con IA** | Borradores contextualizados por perfil y plataforma | SH-03 corregido en desarrollo. Falta la validación final en Telegram; producción sigue en 4.1. [Traspaso](docs/HANDOFF.md#incidencia-sh-03-en-telegram) |
 | **6. Aprobación** | Aprobar, corregir o descartar desde Telegram | Pendiente |
 | **7. Validación** | Pruebas integrales, manejo de errores y documentación | Pendiente |
 
@@ -186,6 +186,10 @@ Los comandos `/nuevo`, `/listo` y `/cancelar` abren, finalizan y cancelan una ca
 La transcripción en desarrollo usa faster-whisper local y un proveedor HTTP configurable. La clasificación editorial comienza al cerrar la captura y obtener las transcripciones necesarias. El contrato de captura agrega los medios agrupados y conserva el contexto editorial de `CLASSIFIED` 1.0. [Arquitectura, contrato y despliegue](docs/multimodal-capture.md)
 
 Una nota de voz puede identificar un proyecto por su nombre o por un alias de voz declarado en el perfil. El relay conserva la selección manual si detecta proyectos distintos o ninguna coincidencia. [Clasificación por voz](docs/multimodal-capture.md#clasificación-por-voz)
+
+### Etapa 5 — Motor editorial SH-03
+
+SH-03 genera borradores en español desde registros `CLASSIFIED`, sus perfiles y sus materiales. El proveedor local selecciona fragmentos de la fuente y el motor escribe un lote `DRAFT` para los destinos habilitados. El bot de desarrollo muestra una vista previa con `/borrador`. La incidencia de la vista previa quedó resuelta en desarrollo; la validación final en Telegram y el despliegue en producción siguen pendientes. [Contrato, proveedores y verificación](docs/editorial-drafts.md)
 
 ### Evolución futura (fuera del alcance de 0.1)
 
@@ -268,6 +272,12 @@ Los registros conservan `content_id`, `source`, `type`, `chat_id`, `message_id`,
 5. **Trazabilidad:** registrar estados, errores y decisiones importantes.
 6. **Simplicidad:** no añadir servicios que el prototipo todavía no necesita.
 
+### 24 de noviembre de 2026 — SH-03 corregido en desarrollo
+
+Tras un reinicio de Docker, el entorno principal volvió automáticamente pero el de desarrollo quedó detenido por falta de política de reinicio. Se restablecieron sus cuatro servicios sin tocar volúmenes, modelos ni producción, y se documentó el [arranque diario](docs/development-workflow.md#arranque-diario-de-los-entornos).
+
+La vista previa de `/borrador` fallaba porque el esquema de Ollama permitía pedir más fragmentos de los disponibles y el modelo repetía IDs. El validador rechazaba esa selección antes de persistir el lote. La corrección limita `maxItems`, declara `uniqueItems`, normaliza repeticiones con advertencia y registra códigos saneados de error. Pasaron 63 pruebas y la validación real en `@Test_Social_Hub_bot`: ambos borradores se generaron con Ollama `qwen2.5:1.5b`, pertenecen al mismo lote y respetaron `sin hashtags; sin emojis`. SH-03 se integró en `main` sin desplegarse en producción.
+
 ---
 
-**Estado actual:** SH-01 y SH-02 integran la recepción, el almacenamiento y la clasificación editorial en las exportaciones actuales. El próximo hito es verificar el teclado y resolver las pulsaciones antes de avanzar a la generación de borradores.
+**Estado actual:** SH-01, SH-02 y SH-03 están integrados en `main`; la recepción, el almacenamiento, la clasificación y los borradores editoriales quedaron validados en desarrollo. SH-03 no está desplegado en producción. La siguiente mejora planificada es la Etapa 5.1 en `dev/editorial-quality`.

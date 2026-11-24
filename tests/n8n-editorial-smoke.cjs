@@ -10,12 +10,15 @@ const { createRelay, telegramCaller, workflowDispatcher } = require('../services
 const { createIntake, downloadPhoto } = require('../services/telegram-relay/intake.cjs');
 const { createCapture } = require('../services/telegram-relay/capture.cjs');
 const { loadProjects, pollCallbacks } = require('../services/telegram-relay/callbacks.cjs');
-const { integratedDrafts } = require('../scripts/telegram-workflows.cjs');
+const { integratedDrafts, editorialDraft } = require('../scripts/telegram-workflows.cjs');
+const { createEditorialEngine } = require('../services/telegram-relay/editorial-drafts.cjs');
+const { templateProvider } = require('../services/telegram-relay/editorial-provider.cjs');
 
 const run = promisify(execFile);
 const root = mkdtempSync(join(tmpdir(), 'social-hub-editorial-'));
 const records = join(root, 'records');
 const incoming = join(root, 'incoming');
+const drafts = join(root, 'drafts');
 const profiles = join(root, 'projects');
 const credential = { id: 'StageFourSmokeAuth', name: 'Header Auth ficticia' };
 const entryId = 'StageFourSmokeEntry';
@@ -116,6 +119,7 @@ function telegramMock(batches, controller, { webhook = '', conflict = false } = 
 function fixture() {
   mkdirSync(records);
   mkdirSync(incoming);
+  mkdirSync(drafts);
   cpSync(join(__dirname, '..', 'projects'), profiles, { recursive: true });
   const newProfile = JSON.parse(readFileSync(join(profiles, 'quasarpunk', 'profile.json')));
   Object.assign(newProfile, { project_id: 'orion', name: 'Orión', aliases: ['observatorio', 'quasar'], profile_version: 7 });
@@ -131,7 +135,8 @@ async function startRelay(mock, port = 0, captureConfig) {
   const fetchMedia = path => downloadPhoto(token, path, mock.api);
   const capture = captureConfig && createCapture({ ...options, fetchMedia, ...captureConfig });
   const intake = capture?.ingest ?? createIntake({ ...options, fetchPhoto: fetchMedia });
-  relay = createRelay({ botToken: token, relayKey, allowedChats: [chat], intake });
+  const editorial = createEditorialEngine({ records, incoming, drafts, provider: templateProvider });
+  relay = createRelay({ botToken: token, relayKey, allowedChats: [chat], intake, generateDraft: editorial.request });
   relay.listen(port, '127.0.0.1');
   await once(relay, 'listening');
   return { ...options, capture, log: () => {} };
@@ -195,7 +200,12 @@ async function main() {
   await run('n8n', ['import:credentials', '--input', save('auth', [{
     ...credential, type: 'httpHeaderAuth', data: { name: 'Authorization', value: 'Bearer ' + relayKey },
   }])], { env });
-  await run('n8n', ['import:workflow', '--input', save('workflows', integratedDrafts({ credential, entryId, classificationId, relayUrl }))], { env });
+  const editorialId = 'StageFiveSmokeEditorial';
+  await run('n8n', ['import:workflow', '--input', save('workflows', [
+    ...integratedDrafts({ credential, entryId, classificationId, relayUrl }),
+    editorialDraft({ credential, entryId: editorialId, relayUrl }),
+  ])], { env });
+  await run('n8n', ['publish:workflow', '--id', editorialId], { env });
   await run('n8n', ['publish:workflow', '--id', classificationId], { env });
   await run('n8n', ['publish:workflow', '--id', entryId], { env });
   const unauthorized = await startN8n();
@@ -309,6 +319,17 @@ async function main() {
   assert.deepEqual(distributed.capture, grouped.capture);
   assert.deepEqual(bytes(5), saved);
   console.log('n8n 2.48.6: captura multimodal, transcripción simulada, teclado y reinicio verificados.');
+  const editorialUrl = n8n + '/webhook/social-hub/editorial-draft';
+  const denied = await fetch(editorialUrl, { method: 'POST' });
+  assert.ok([401, 403].includes(denied.status));
+  const generate = workflowDispatcher(editorialUrl, relayKey);
+  const result = await generate({ content_id: distributed.content_id });
+  assert.equal(result.draft_contract_version, '1.0');
+  assert.equal(result.status, 'DRAFT');
+  assert.ok(result.drafts.every(draft => draft.text.includes('Grabación de Radio Lamat') && draft.media.length === 2));
+  assert.deepEqual(await generate({ content_id: distributed.content_id }), result);
+  assert.deepEqual(JSON.parse(readFileSync(join(records, multimodalFile))), distributed);
+  console.log('n8n 2.48.6: SH-03 verificó borradores, autorización, reentrega y persistencia con proveedor simulado.');
 }
 
 main().catch(failure => {

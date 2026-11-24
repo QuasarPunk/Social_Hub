@@ -1,0 +1,66 @@
+{
+  "name": "SH-03 - Borradores editoriales",
+  "nodes": [
+    {
+      "id": "editorial-entry",
+      "name": "Recibir solicitud editorial",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "webhookId": "049c18b7-42be-48ab-8e85-c4338c06d8b7",
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "social-hub/editorial-draft",
+        "authentication": "headerAuth",
+        "responseMode": "lastNode",
+        "options": {}
+      }
+    },
+    {
+      "id": "draft-engine",
+      "name": "Generar y guardar borradores",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        260,
+        0
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "http://telegram-relay:8080/drafts",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json.body }}",
+        "options": {
+          "timeout": 175000
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Recibir solicitud editorial": {
+      "main": [
+        [
+          {
+            "node": "Generar y guardar borradores",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "saveDataErrorExecution": "none",
+    "saveDataSuccessExecution": "none",
+    "saveManualExecutions": false,
+    "saveExecutionProgress": false
+  }
+}
