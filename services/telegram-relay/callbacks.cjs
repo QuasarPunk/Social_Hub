@@ -2,6 +2,7 @@ const { setTimeout: delay } = require('node:timers/promises');
 
 const { slug, loadProjects, classifiedRecord, readRecord, saveRecord } = require('./editorial.cjs');
 const { deliverIntakeReply } = require('./intake.cjs');
+const { startEditorialPreview } = require('./editorial-preview.cjs');
 const callbackPattern = new RegExp(`^sh:(${slug}):(${slug})$`);
 
 function seedRecord(directory, projects, chat) {
@@ -93,7 +94,9 @@ async function pollCallbacks(options, signal) {
         if (!Number.isSafeInteger(update?.update_id)) continue;
         if (update.callback_query) await handleCallback(update.callback_query, options);
         if (dispatchMessage && options.allowedChats.has(update.message?.chat?.id)) {
-          await deliverIntakeReply(update, options, signal);
+          if (!options.editorial || !startEditorialPreview(update.message, options, signal)) {
+            await deliverIntakeReply(update, options, signal);
+          }
         }
         offset = Math.max(offset ?? 0, update.update_id + 1);
       }

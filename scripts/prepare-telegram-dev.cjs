@@ -1,12 +1,17 @@
 const { spawnSync } = require('node:child_process');
 const { readFileSync, renameSync, unlinkSync, writeFileSync } = require('node:fs');
 const { resolve, join } = require('node:path');
-const { integratedDrafts } = require('./telegram-workflows.cjs');
+const { integratedDrafts, editorialDraft } = require('./telegram-workflows.cjs');
 
 const root = resolve(__dirname, '..');
 const secretDir = join(root, 'secrets', 'telegram-dev');
 const compose = ['compose', '--env-file', '.env.example', '-p',
   'social-hub-telegram-dev', '-f', 'compose.telegram-dev.yml'];
+const editorial = process.argv.includes('--editorial');
+if (editorial) {
+  compose.push('-f', 'compose.editorial-dev.yml');
+  if (process.env.EDITORIAL_PROVIDER !== 'template') compose.push('--profile', 'editorial-model');
+}
 
 function run(command, args, message, input) {
   const result = spawnSync(command, args, { cwd: root, input, encoding: 'utf8', timeout: 180000 });
@@ -82,15 +87,18 @@ async function main() {
   console.log('Configuración de Docker Compose válida.');
   if (process.argv.includes('--check')) return;
   const integrated = process.argv.includes('--integrated');
-  if (!integrated && chats.length !== 1) throw new Error('Para preparar el borrador, dejá un único destino en allowed-chats.');
+  if (!integrated && !editorial && chats.length !== 1) throw new Error('Para preparar el borrador, dejá un único destino en allowed-chats.');
 
   const credential = { id: 'SocialHubTelegramAuth01', name: 'Telegram Relay Dev', type: 'httpHeaderAuth' };
-  const workflows = integrated ? integratedDrafts({
+  let workflows;
+  if (editorial) {
+    workflows = [editorialDraft({ credential: { id: credential.id, name: credential.name }, entryId: 'SocialHubDevEditorial03' })];
+  } else workflows = integrated ? integratedDrafts({
     credential: { id: credential.id, name: credential.name },
     entryId: 'SocialHubDevEntry01',
     classificationId: 'SocialHubDevClass02',
   }) : [draftFor(chats[0], credential)];
-  if (integrated) {
+  if (integrated || editorial) {
     process.env.TELEGRAM_POLLING = '0';
     process.env.TELEGRAM_DEV_CALLBACKS = '0';
   }

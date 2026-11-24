@@ -1,0 +1,33 @@
+services:
+  n8n:
+    volumes:
+      - editorial_drafts:/files/drafts:ro
+
+  telegram-relay:
+    environment:
+      EDITORIAL_ENABLED: "1"
+      EDITORIAL_PROVIDER: "${EDITORIAL_PROVIDER:-ollama}"
+      EDITORIAL_MODEL: "${EDITORIAL_MODEL:-qwen2.5:1.5b}"
+      EDITORIAL_OLLAMA_URL: "${EDITORIAL_OLLAMA_URL:-http://ollama:11434}"
+      EDITORIAL_VISION: "${EDITORIAL_VISION:-0}"
+    volumes:
+      - editorial_drafts:/data/drafts
+
+  ollama:
+    profiles: [editorial-model]
+    image: ollama/ollama:0.13.5
+    environment:
+      OLLAMA_NO_CLOUD: "1"
+      OLLAMA_MAX_LOADED_MODELS: "1"
+      OLLAMA_NUM_PARALLEL: "1"
+      OLLAMA_CONTEXT_LENGTH: "4096"
+    volumes:
+      - editorial_models:/root/.ollama
+    networks:
+      - telegram_internal
+
+volumes:
+  editorial_drafts:
+  editorial_models:
+    external: true
+    name: social-hub-telegram-dev_ollama_models
