@@ -68,6 +68,12 @@ La descarga inicial del modelo necesita Internet. Para otro modelo multilingüe,
 
 Las pruebas usan un reloj controlado y doblajes de Telegram y transcripción. Ejecutá `node --test tests/*.test.cjs` y el smoke test aislado de n8n. [Integración aislada](editorial-classification.md#verificación-aislada)
 
+## Validación en producción
+
+La Etapa 4.1 se habilitó con un único receptor para el bot principal, Header Auth y faster-whisper local. Se verificó la restauración del respaldo de SQLite, se cotejaron por SHA-256 los 36 archivos históricos y pasaron las 44 pruebas y el smoke test de n8n 2.48.6.
+
+La captura real conservó en un solo registro la nota Ogg/Opus y la foto JPEG. El orden registrado fue voz y foto. La transcripción identificó QuasarPunk y el relay confirmó `CLASSIFIED` 1.0, `transcript_match` y perfil 2. n8n leyó los mismos originales y el mismo JSON persistido.
+
 ## Despliegue futuro y reversión
 
 La Etapa 4.1 se habilita en el entorno principal después de validar el bot de pruebas y de una autorización de despliegue. Respaldá n8n, `records`, `incoming` y el volumen de sesiones si ya existe. Conservá los secretos del entorno y la configuración de polling. El overlay agrega el almacenamiento de sesiones y un transcriptor en la red interna.
