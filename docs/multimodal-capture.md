@@ -30,6 +30,18 @@ El resultado se escribe en `/files/records/mm-<id>.json`. Los registros de la Et
 
 Para SH-03, `capture.materials` será la fuente de los medios de un registro multimodal. `media_path` conserva la ruta de la primera fotografía o `null`. La Etapa 5 permanece pendiente.
 
+## Clasificación por voz
+
+La revisión de desarrollo encontró tres audios originales persistidos con transcripciones completas antes de clasificar. El worker ya incluía esas transcripciones en `instruction`. SH-02 admite el mensaje de Telegram y la clasificación se ejecuta en el relay al cerrar la sesión. En la reproducción, el audio neutral quedó sin coincidencia. En los otros dos, faster-whisper produjo las variantes «equaldea la mat» y «vitácora», ausentes del catálogo anterior.
+
+El clasificador normaliza mayúsculas, tildes, espacios y puntuación de cada transcripción en memoria. Busca frases completas por nombre, alias o `spoken_aliases` del catálogo activo. El campo opcional `spoken_aliases` se aplica solo a voz y admite entradas de al menos cuatro caracteres normalizados. Un proyecto identificado exclusivamente desde audio queda con método `transcript_match`. Las coincidencias escritas y habladas se combinan por proyecto. Si apuntan a proyectos distintos, el resultado queda en `AMBIGUOUS` con método `mixed_match` y se presentan los candidatos. Se conserva la transcripción original del proveedor.
+
+Faster-whisper recibe por defecto un `initial_prompt` con los nombres canónicos de los perfiles activos. Se omite si el vocabulario supera 240 caracteres. En la comparación local recuperó ambos nombres deformados y mantuvo el sentido neutral de la tercera muestra. La sugerencia puede introducir sesgos y puede deshabilitarse con `WHISPER_PROJECT_PROMPT=0`. Después de editar los perfiles, recreá el relay y el transcriptor para que ambos carguen el catálogo actualizado. [Parámetro inicial de faster-whisper](https://github.com/SYSTRAN/faster-whisper/blob/v1.2.1/faster_whisper/transcribe.py)
+
+La relectura aislada reprodujo las dos coincidencias con las transcripciones ya guardadas y al volver a transcribir los originales. La tercera nota permaneció sin coincidencia. Se verificó por hash que los 20 archivos revisados permanecieran intactos. En la prueba por Telegram, una nota nueva sin texto ni selección manual quedó clasificada en QuasarPunk con `transcript_match`, perfil 2 y contrato `CLASSIFIED` 1.0. El registro y el audio permanecieron disponibles al recrear el relay.
+
+Se verificaron la captura explícita y automática, dos fotos persistidas en una misma sesión y una cancelación sin registro editorial. Las fotos reales revisadas no incluían `media_group_id`. La persistencia de ese identificador y de los elementos de un álbum se verificó con Telegram simulado.
+
 ## Transcripción local
 
 El proveedor de desarrollo es faster-whisper 1.2.1, en CPU con `int8`, idioma español y modelo multilingüe `small`. PyAV 15.1.0 decodifica Ogg/Opus y los demás formatos que reconoce su versión de FFmpeg. Esa versión queda fijada porque la API de PyAV 19 no es compatible con el decodificador de faster-whisper 1.2.1.
@@ -58,6 +70,17 @@ Las pruebas usan un reloj controlado y doblajes de Telegram y transcripción. Ej
 
 ## Despliegue futuro y reversión
 
-La Etapa 4.1 se habilita en el entorno principal después de validar el bot de pruebas y de una autorización de despliegue. Al preparar ese corte, respaldá n8n, `records`, `incoming` y el volumen que se usará para `/data/sessions`. Montá el volumen de sesiones con permisos de escritura para el relay y el servicio de transcripción en una red interna. Cargá el modelo antes de habilitar `TELEGRAM_MULTIMODAL=1`. Conservá el consumidor único y los secretos propios del entorno.
+La Etapa 4.1 se habilita en el entorno principal después de validar el bot de pruebas y de una autorización de despliegue. Respaldá n8n, `records`, `incoming` y el volumen de sesiones si ya existe. Conservá los secretos del entorno y la configuración de polling. El overlay agrega el almacenamiento de sesiones y un transcriptor en la red interna.
 
-Para revertir, recreá el relay con `TELEGRAM_MULTIMODAL=0`. Así se usa la entrada de texto y fotos de la Etapa 4, con el mismo consumidor. Conservá las sesiones, originales, transcripciones y registros para poder retomar el procesamiento o revisarlos. Deshabilitá primero el polling si además necesitás cambiar el consumidor de Telegram. [Reversión del consumidor](editorial-classification.md#procedimiento-de-despliegue-principal)
+```powershell
+$main = @('--env-file','.env','-p','social_hub','-f','docker-compose.yml','-f','compose.telegram-main.yml','-f','compose.telegram-multimodal-main.yml','--profile','multimodal')
+docker compose @main config --quiet
+docker compose @main build transcriber
+docker compose @main create transcriber
+docker run --rm --mount "type=volume,source=social_hub_whisper_models,target=/models" --entrypoint python social_hub-transcriber -c "from faster_whisper.utils import download_model; download_model('small')"
+docker compose @main up -d --no-deps transcriber
+```
+
+Verificá `GET /health` del transcriptor desde la red interna y conservá los workflows publicados. Configurá `TELEGRAM_MULTIMODAL=1` en el entorno principal y recreá solo el relay con `docker compose @main up -d --no-deps --build telegram-relay`. Revisá que el receptor haya iniciado y que el circuito autorizado entregue una captura con audio. Incluí el volumen de sesiones en los respaldos posteriores.
+
+Para revertir, guardá `TELEGRAM_MULTIMODAL=0` en la configuración local y recreá el mismo relay con el overlay. Volverá a la recepción individual de texto y fotos con el mismo consumidor. Conservá los volúmenes para retomar o revisar las capturas y detené el transcriptor si ya no se usa. Deshabilitá primero el polling si además necesitás cambiar el consumidor de Telegram. [Reversión del consumidor](editorial-classification.md#procedimiento-de-despliegue-principal)

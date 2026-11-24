@@ -201,7 +201,7 @@ function createCapture(options) {
       stop?.throwIfAborted();
       if (typeof result?.text !== 'string' || !result.text.trim()) throw new Error('no_recognized_speech');
       updateSession(path, session.id, current => Object.assign(current.materials[index], {
-        transcription: { ...result, text: result.text.trim(), language: 'es' }, error: null,
+        transcription: { ...result, language: 'es' }, error: null,
       }));
     } catch {
       stop?.throwIfAborted();
@@ -316,8 +316,11 @@ function httpTranscriber(url, fetchAudio = fetch) {
       await response.body?.cancel();
       throw new Error('transcriber_unavailable');
     }
-    const { text, model } = await response.json();
-    return { text, provider: 'local-http', ...(model && { model }) };
+    const { text, model, catalog_prompt } = await response.json();
+    return {
+      text, provider: 'local-http', ...(model && { model }),
+      ...(typeof catalog_prompt === 'boolean' && { catalog_prompt }),
+    };
   };
 }
 

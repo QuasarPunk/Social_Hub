@@ -1,7 +1,7 @@
 
 {
   "schema_version": "1.0",
-  "profile_version": 1,
+  "profile_version": 2,
   "project_id": "lamat",
   "name": "Ecoaldea Lamat",
   "active": true,
@@ -10,6 +10,7 @@
     "ecoaldea lamat",
     "radio lamat"
   ],
+  "spoken_aliases": ["ecoaldea la mat", "equaldea lamat", "equaldea la mat", "radio la mat"],
   "identity": {
     "description": "Proyecto comunitario, científico, educativo y cultural basado en la permacultura.",
     "mission": "Construir alternativas socioambientales regenerativas mediante la educación, la cooperación y la acción comunitaria.",

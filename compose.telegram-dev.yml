@@ -53,9 +53,11 @@ services:
     environment:
       WHISPER_MODEL: "${WHISPER_MODEL:-small}"
       WHISPER_THREADS: "${WHISPER_THREADS:-4}"
+      WHISPER_PROJECT_PROMPT: "${WHISPER_PROJECT_PROMPT:-1}"
       HF_HUB_OFFLINE: "1"
     volumes:
       - whisper_models:/models
+      - ./projects:/projects:ro
     networks:
       - telegram_internal
 

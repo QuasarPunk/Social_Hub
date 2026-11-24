@@ -1,0 +1,19 @@
+services:
+  telegram-relay:
+    environment:
+      TELEGRAM_MULTIMODAL: "${TELEGRAM_MULTIMODAL:-0}"
+      TELEGRAM_CAPTURE_IDLE_MS: "${TELEGRAM_CAPTURE_IDLE_MS:-90000}"
+      TELEGRAM_CAPTURE_MAX_MS: "${TELEGRAM_CAPTURE_MAX_MS:-600000}"
+      TELEGRAM_TRANSCRIBE_URL: "${TELEGRAM_TRANSCRIBE_URL:-http://transcriber:8090/transcribe}"
+      TELEGRAM_ALLOWED_USERS: "${TELEGRAM_ALLOWED_USERS:-}"
+    volumes:
+      - telegram_sessions:/data/sessions
+
+  transcriber:
+    extends:
+      file: compose.telegram-dev.yml
+      service: transcriber
+
+volumes:
+  telegram_sessions:
+  whisper_models:

@@ -297,3 +297,75 @@ test('si el worker se detiene durante la transcripción, retoma el audio persist
   assert.equal(f.downloads.length, 1);
   assert.equal(f.records()[0].status, 'CLASSIFIED');
 });
+
+for (const [transcription, expected] of [
+  ['Este material es para QUASARPUNK.', ['quasarpunk']],
+  ['Material para Ecoaldea Lamat.', ['lamat']],
+  ['Esto es para la Bitácora.', ['bitacora']],
+  ['  Para Cuásar–Punk.  ', ['quasarpunk']],
+  ['Para equaldea, la mat.', ['lamat']],
+  ['Para la vitácora.', ['bitacora']],
+  ['Esto es un audio neutral.', []],
+  ['Palabras como megavitácora y quasarpunkero.', []],
+  ['Bitácora: también se publica para Radio Lamat.', ['bitacora', 'lamat']],
+]) {
+  test('clasifica desde la transcripción sin cambiar su contenido ' + JSON.stringify(expected), async t => {
+    const f = fixture(t, { async transcribe() { return { text: transcription }; } });
+    await f.save(voice);
+    await f.save({ text: '/listo' });
+    await f.tick();
+    const [record] = f.records();
+    assert.equal(record.capture.materials[0].transcription.text, transcription);
+    assert.deepEqual(record.classification.candidates.map(p => p.project_id), expected);
+    assert.equal(record.status, expected.length === 1 ? 'CLASSIFIED' : 'PENDING_CLASSIFICATION');
+    assert.equal(record.classification.method, expected.length ? 'transcript_match' : null);
+  });
+}
+
+test('un pie con prefijo y un proyecto distinto en el audio conservan el teclado', async t => {
+  const f = fixture(t);
+  await f.save(photo('first', 'QuasarPunk: muestra'));
+  await f.save(voice);
+  await f.save({ text: '/listo' });
+  await f.tick();
+  const [record] = f.records();
+  assert.equal(record.status, 'PENDING_CLASSIFICATION');
+  assert.equal(record.classification.method, 'mixed_match');
+  assert.deepEqual(record.classification.candidates.map(p => p.project_id), ['lamat', 'quasarpunk']);
+});
+
+test('no clasifica hasta resolver una transcripción lenta', async t => {
+  const { promise, resolve } = Promise.withResolvers();
+  const f = fixture(t, { transcribe: () => promise });
+  await f.save(photo('test', 'Una imagen'));
+  await f.save(voice);
+  await f.save({ text: '/listo' });
+  const firstTick = f.tick();
+  await f.tick();
+  assert.equal(f.records().length, 0);
+  assert.equal(f.sessions()[0].status, 'SEALED');
+  resolve({ text: 'Para Cuásar Punk' });
+  await firstTick;
+  assert.equal(f.records()[0].project_id, 'quasarpunk');
+  assert.equal(f.records()[0].classification.method, 'transcript_match');
+});
+
+test('un nuevo perfil usa sus alias de voz desde JSON y no los aplica a texto escrito', async t => {
+  const directory = fs.mkdtempSync(join(tmpdir(), 'sh-spoken-profile-'));
+  t.after(() => fs.rmSync(directory, { recursive: true, force: true }));
+  const profile = { ...projects.get('lamat'), project_id: 'cobalto', name: 'Cobalto', aliases: [],
+    spoken_aliases: ['Club Kobalto'] };
+  fs.mkdirSync(join(directory, profile.project_id));
+  fs.writeFileSync(join(directory, profile.project_id, 'profile.json'), JSON.stringify(profile));
+  const f = fixture(t, {
+    projects: loadProjects(directory), async transcribe() { return { text: 'Material para Club Kobalto.' }; },
+  });
+  await f.save({ text: 'Material para Club Kobalto.' });
+  await f.save({ text: '/listo' });
+  await f.tick();
+  assert.equal(f.records()[0].classification.status, 'UNIDENTIFIED');
+  await f.save(voice);
+  await f.save({ text: '/listo' });
+  await f.tick();
+  assert.ok(f.records().some(r => r.project_id === 'cobalto' && r.classification.method === 'transcript_match'));
+});

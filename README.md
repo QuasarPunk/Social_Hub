@@ -2,7 +2,7 @@
 
 **Sistema inteligente y autohospedado de gestión de contenidos para redes sociales**
 
-> **Estado:** En desarrollo · **Versión objetivo:** 0.1 (prototipo) · Etapa 4 completada en el entorno principal · Etapa 4.1 implementada en desarrollo
+> **Estado:** En desarrollo · **Versión objetivo:** 0.1 (prototipo) · Etapa 4 completada en el entorno principal · Etapa 4.1 validada en desarrollo
 
 ## ¿Qué es Social Hub?
 
@@ -151,7 +151,7 @@ La instalación principal usa el Telegram Relay como único receptor y SH-01 com
 | **2. Telegram** | Bot, webhook HTTPS, filtro por chat y respuesta | **Completada** (exportación del workflow pendiente como tarea documental) |
 | **3. Recepción y almacenamiento** | Recepción, almacenamiento y confirmación | **Completada funcionalmente** |
 | **4. Contexto editorial** | Clasificación dinámica, perfiles configurables y selección manual | Desplegada. Texto y selección validados en producción. Verificación de foto real en producción pendiente |
-| **4.1. Captura multimodal y sesiones de contenido** | Captura agrupada de fotos, texto y audio con transcripción configurable | Implementada en desarrollo. Validación real pendiente |
+| **4.1. Captura multimodal y sesiones de contenido** | Captura agrupada de fotos, texto y audio con transcripción configurable | Validada en desarrollo. Despliegue principal pendiente |
 | **5. Generación con IA** | Borradores contextualizados a partir de texto e imagen | Pendiente |
 | **6. Aprobación** | Aprobar, corregir o descartar desde Telegram | Pendiente |
 | **7. Validación** | Pruebas integrales, manejo de errores y documentación | Pendiente |
@@ -184,6 +184,8 @@ El modo multimodal agrupa fotografías, textos, notas de voz y archivos de audio
 Los comandos `/nuevo`, `/listo` y `/cancelar` abren, finalizan y cancelan una captura, respectivamente. Una sesión explícita puede esperar la llegada de notas de voz largas.
 
 La transcripción en desarrollo usa faster-whisper local y un proveedor HTTP configurable. La clasificación editorial comienza al cerrar la captura y obtener las transcripciones necesarias. El contrato de captura agrega los medios agrupados y conserva el contexto editorial de `CLASSIFIED` 1.0. [Arquitectura, contrato y despliegue](docs/multimodal-capture.md)
+
+Una nota de voz puede identificar un proyecto por su nombre o por un alias de voz declarado en el perfil. El relay conserva la selección manual si detecta proyectos distintos o ninguna coincidencia. [Clasificación por voz](docs/multimodal-capture.md#clasificación-por-voz)
 
 ### Evolución futura (fuera del alcance de 0.1)
 

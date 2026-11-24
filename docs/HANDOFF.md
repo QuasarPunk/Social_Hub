@@ -12,7 +12,7 @@ La Etapa 4 está desplegada con n8n 2.48.6. El relay es el único receptor de Te
 
 - Pasaron la matriz de ocho criterios, la suite de regresión y la integración aislada. El bot de desarrollo comprobó texto, foto, clasificación por identificador y alias, teclados ambiguos e idempotencia.
 - En el bot principal se verificaron la clasificación automática, la selección manual y la persistencia de una fotografía que n8n pudo leer. Los 25 registros y 5 archivos históricos conservaron sus bytes. La Etapa 4 quedó cerrada.
-- La rama `dev/multimodal-capture` implementa la Etapa 4.1 mediante un modo opt-in del relay y un transcriptor local. La próxima misión es verificar el circuito con el bot de pruebas y revisar los resultados antes de integrar la rama o desplegar la 4.1. La Etapa 5 sigue pendiente.
+- La rama `dev/multimodal-capture` implementa la Etapa 4.1. La revisión de audios reales confirmó que los nombres deformados por la transcripción no coincidían con el catálogo anterior. La corrección usa alias de voz exactos y contexto de catálogo en el transcriptor. La Etapa 5 sigue pendiente. [Diagnóstico y solución](multimodal-capture.md#clasificación-por-voz)
 
 ## Problemas conocidos
 
@@ -37,7 +37,7 @@ El último comando prepara los borradores y la credencial interna de una instanc
 
 El despacho está en `services/telegram-relay/callbacks.cjs`, la sesión y el worker en `capture.cjs` y la clasificación común en `editorial.cjs`. SH-01 y SH-02 de n8n 2.48.6 mantuvieron sus JSON y versiones de nodos. La suite cubre los criterios de la tabla y el smoke test comprueba una captura de foto y voz a través de ambos workflows. [Preparación y reversión](multimodal-capture.md#instalación-y-prueba-en-desarrollo)
 
-Pasaron las 32 pruebas de Node.js, la integración aislada de ambas etapas y la prueba local de Ogg/Opus en español. La validación con mensajes reales de Telegram sigue pendiente. [Resultados del transcriptor](multimodal-capture.md#transcripción-local)
+Pasaron 44 pruebas de Node.js y la integración de n8n. La relectura de tres notas reales dejó intactos los archivos y recuperó las dos coincidencias esperadas. Una nota nueva con solo voz se clasificó en QuasarPunk con `transcript_match`, perfil 2 y confirmación de Telegram. La Etapa 4.1 quedó validada en desarrollo y aguarda autorización para desplegarse en el entorno principal. [Resultados de voz](multimodal-capture.md#clasificación-por-voz)
 
 | Área | Criterio de aceptación |
 | --- | --- |
@@ -48,4 +48,4 @@ Pasaron las 32 pruebas de Node.js, la integración aislada de ambas etapas y la 
 | Transcripción y clasificación | Usar un proveedor configurable y evaluar primero alternativas locales y gratuitas. Probar transcripciones pendientes y reintentos. Clasificar el conjunto solo después de finalizar la captura y obtener las transcripciones necesarias. |
 | Compatibilidad | Conservar el acceso a los registros históricos y cubrir la recepción de texto y fotografía, los callbacks y el contrato actual con pruebas de regresión. |
 
-Para la validación humana, usá el bot de desarrollo desde un chat privado autorizado. Enviá un texto con prefijo de QuasarPunk y esperá el cierre automático. Luego usá `/nuevo`, enviá un álbum sin prefijo, grabá una nota neutral en español y enviá `/listo`. Elegí un proyecto en el teclado. Abrí otra sesión, enviá un texto y cancelala. Inspeccioná el registro, los medios, la transcripción, la respuesta a la pulsación y el estado cancelado sin publicar datos de la prueba.
+Para repetir la prueba de voz, usá el bot de desarrollo desde un chat privado autorizado. Enviá `/nuevo`, grabá una nota que mencione QuasarPunk y enviá `/listo`. Confirmá `CLASSIFIED`, `transcript_match`, audio persistido y transcripción presente en un único registro. La próxima misión es el despliegue principal al recibir autorización. [Procedimiento de despliegue y reversión](multimodal-capture.md#despliegue-futuro-y-reversión)

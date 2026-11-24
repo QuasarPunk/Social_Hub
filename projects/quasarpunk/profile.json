@@ -1,7 +1,7 @@
 
 {
   "schema_version": "1.0",
-  "profile_version": 1,
+  "profile_version": 2,
   "project_id": "quasarpunk",
   "name": "QuasarPunk",
   "active": true,
@@ -10,6 +10,7 @@
     "quasar",
     "qp"
   ],
+  "spoken_aliases": ["quasar punk", "cuásar punk"],
   "identity": {
     "description": "Proyecto de educación, divulgación tecnológica y cultura maker.",
     "mission": "Democratizar el conocimiento científico y tecnológico mediante la experimentación y el aprendizaje práctico.",

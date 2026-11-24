@@ -209,10 +209,10 @@ async function main() {
   assert.equal(classifiedOutput.project_id, 'quasarpunk');
   await pollCallbacks({ ...options, dispatchMessage }, AbortSignal.any([firstController.signal, AbortSignal.timeout(30000)]));
   assert.deepEqual(first.offsets, [undefined, 9]);
-  const automatic = classified(1, 'quasarpunk', 1, 'explicit_prefix');
-  classified(2, 'lamat', 1, 'alias_match');
-  classified(3, 'bitacora', 1, 'alias_match');
-  const photo = classified(4, 'quasarpunk', 1, 'explicit_prefix');
+  const automatic = classified(1, 'quasarpunk', 2, 'explicit_prefix');
+  classified(2, 'lamat', 2, 'alias_match');
+  classified(3, 'bitacora', 2, 'alias_match');
+  const photo = classified(4, 'quasarpunk', 2, 'explicit_prefix');
   assert.equal(photo.type, 'photo');
   assert.equal(photo.media_path, '/files/incoming/tg-4.jpg');
   assert.deepEqual(first.files, ['large']);
@@ -245,8 +245,8 @@ async function main() {
     'Proyecto no disponible.', 'Selección inválida.', 'Clasificado en QuasarPunk',
     'Ya clasificado: QuasarPunk', 'Ya clasificado: QuasarPunk',
   ]);
-  assert.deepEqual(classified(1, 'quasarpunk', 1, 'explicit_prefix'), automatic);
-  const manual = classified(5, 'quasarpunk', 1, 'telegram_selection');
+  assert.deepEqual(classified(1, 'quasarpunk', 2, 'explicit_prefix'), automatic);
+  const manual = classified(5, 'quasarpunk', 2, 'telegram_selection');
   assert.deepEqual(Object.keys(manual).sort(), Object.keys(automatic).sort());
   const saved = bytes(5);
   assert.equal((await dispatchMessage(ambiguous)).project_id, 'quasarpunk');
@@ -290,6 +290,7 @@ async function main() {
   const grouped = JSON.parse(readFileSync(join(records, multimodalFile)));
   const button = captureMock.messages.at(-1).reply_markup.inline_keyboard.flat().find(x => x.callback_data.endsWith(':lamat'));
   assert.equal(grouped.status, 'PENDING_CLASSIFICATION');
+  assert.equal(grouped.classification.method, 'mixed_match');
   assert.deepEqual(grouped.capture.materials.map(x => x.type), ['photo', 'voice']);
   assert.equal(grouped.capture.materials[1].transcription.provider, 'fixture');
   assert.ok(grouped.capture.materials.every(x => readFileSync(join(incoming, x.media_path.split('/').at(-1))).equals(photoBytes)));

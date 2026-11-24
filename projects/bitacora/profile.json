@@ -1,7 +1,7 @@
 
 {
   "schema_version": "1.0",
-  "profile_version": 1,
+  "profile_version": 2,
   "project_id": "bitacora",
   "name": "Bitácora",
   "active": true,
@@ -11,6 +11,7 @@
     "agenda bitacora",
     "agenda cultural bitacora"
   ],
+  "spoken_aliases": ["vitácora"],
   "identity": {
     "description": "Agenda cultural comunitaria de la Comarca Viedma-Patagones, dedicada a difundir gratuitamente actividades y artistas locales.",
     "mission": "Facilitar el acceso a la agenda cultural de la comarca y contribuir a la visibilidad de sus artistas, espacios y propuestas culturales.",
