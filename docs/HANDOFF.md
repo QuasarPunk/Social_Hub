@@ -37,6 +37,8 @@ El último comando prepara los borradores y la credencial interna de una instanc
 
 El despacho está en `services/telegram-relay/callbacks.cjs`, la sesión y el worker en `capture.cjs` y la clasificación común en `editorial.cjs`. SH-01 y SH-02 de n8n 2.48.6 mantuvieron sus JSON y versiones de nodos. La suite cubre los criterios de la tabla y el smoke test comprueba una captura de foto y voz a través de ambos workflows. [Preparación y reversión](multimodal-capture.md#instalación-y-prueba-en-desarrollo)
 
+Pasaron las 32 pruebas de Node.js, la integración aislada de ambas etapas y la prueba local de Ogg/Opus en español. La validación con mensajes reales de Telegram sigue pendiente. [Resultados del transcriptor](multimodal-capture.md#transcripción-local)
+
 | Área | Criterio de aceptación |
 | --- | --- |
 | Medios | Recibir y persistir notas de voz y archivos de audio, y agruparlos con fotos y textos consecutivos de la misma sesión. |

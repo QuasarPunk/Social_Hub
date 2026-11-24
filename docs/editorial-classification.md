@@ -51,6 +51,7 @@ Desde PowerShell en la raíz, con Docker disponible e imagen local de n8n 2.48.6
 
 ```powershell
 node --test tests/*.test.cjs
+if ($LASTEXITCODE -ne 0) { throw 'Fallaron las pruebas de Node.js' }
 $root = (Get-Location).Path
 docker run --rm --init --pull never --network none `
   --mount "type=bind,source=$root/tests/n8n-editorial-smoke.cjs,target=/test/tests/n8n-editorial-smoke.cjs,readonly" `
